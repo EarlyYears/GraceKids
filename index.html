@@ -312,7 +312,7 @@ const sessionClasses=EV?EVENING_CLASSES:MORNING_CLASSES;
 const placementOptions=EV?EVENING_PLACEMENT:MORNING_PLACEMENT;
 let children=[],incidents=[],deskNotes=[],sessionSnapshots=[],checkInHistory=[];
 let currentFilter='all',currentSearch='',registryFilter='all';
-let confirmingRemoval=null,editingIdx=null,pendingCheckinIdx=null;
+let confirmingRemoval=null,editingIdx=null,pendingCheckinIdx=null,pendingFamily=null,pendingFamilyCode=null;
 let lineChartInst=null,barChartInst=null,syncTimeout=null;
 let fbLoaded=false;
 let familyCodes={};
