@@ -343,7 +343,7 @@ function loadAllData(){
   onValue(ref(db,'data'),snap=>{
     const d=snap.val()||{};
     const ch=d.children||{};
-    Object.assign(teachers,d.teachers||{});
+const ft=d.teachers||{};Object.keys(ft).forEach(k=>{teachers[k]=ft[k];});
     children=Object.entries(ch).map(([k,v])=>fbToChild(k,v)).sort((a,b)=>a.name.localeCompare(b.name));
     incidents=Object.values(d.incidents||{}).sort((a,b)=>b.date.localeCompare(a.date));
     deskNotes=Object.values(d.deskNotes||{}).sort((a,b)=>b.timestamp-a.timestamp);
