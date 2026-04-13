@@ -315,6 +315,8 @@ let currentFilter='all',currentSearch='',registryFilter='all';
 let confirmingRemoval=null,editingIdx=null,pendingCheckinIdx=null;
 let lineChartInst=null,barChartInst=null,syncTimeout=null;
 let fbLoaded=false;
+let familyCodes={};
+function getFamilyCode(c){const fk=getFamilyKey(c).replace(/[.#$[\]|]/g,'_');const sessionKey=now.toISOString().split('T')[0]+'_'+session;const storeKey=fk+'_'+sessionKey;if(!familyCodes[storeKey]){familyCodes[storeKey]=genCode();set(ref(db,'data/familyCodes/'+storeKey),familyCodes[storeKey]);}return familyCodes[storeKey];}
 
 document.getElementById('today-date').textContent=now.toLocaleDateString('en-CA',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
 document.getElementById('desk-date').value=now.toISOString().split('T')[0];
@@ -350,6 +352,7 @@ function loadAllData(){
     deskNotes=Object.values(d.deskNotes||{}).sort((a,b)=>b.timestamp-a.timestamp);
     sessionSnapshots=Object.values(d.snapshots||{});
     checkInHistory=Object.values(d.checkins||{});
+    Object.assign(familyCodes,d.familyCodes||{});
     setSyncStatus('ok',`Loaded ${children.length} children · ${new Date().toLocaleTimeString()}`);
     if(!fbLoaded){fbLoaded=true;checkSessionReset();}
     renderFilterRow();renderList();renderDashboard();
