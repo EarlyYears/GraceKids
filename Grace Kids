@@ -173,6 +173,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div><div class="app-title">Early Years / Grace Kids</div><div class="app-date" id="today-date"></div></div>
     <div style="display:flex;gap:8px;align-items:center;">
       <button class="btn small" onclick="saveSnapshot()">Save snapshot</button>
+      <button class="btn small" onclick="importFromSheet()" style="background:#5E5CE6;color:white;border-color:#5E5CE6;">Import children</button>
       <div id="session-badge" class="session-badge"></div>
     </div>
   </div>
@@ -466,6 +467,24 @@ function renderRegistry(q){const search=(q||'').toLowerCase();renderRegistryFilt
 function generateReports(){const from=document.getElementById('report-from').value;const to=document.getElementById('report-to').value;const sf=document.getElementById('report-session').value;if(!from||!to)return;const filtered=sessionSnapshots.filter(s=>s.date>=from&&s.date<=to&&(sf==='all'||s.session===sf)).sort((a,b)=>a.date.localeCompare(b.date)||a.session.localeCompare(b.session));const sl=sf==='all'?'All sessions':sf+' only';document.getElementById('line-chart-title').textContent=`Attendance trend — ${sl}`;if(lineChartInst)lineChartInst.destroy();lineChartInst=new Chart(document.getElementById('line-chart'),{type:'line',data:{labels:filtered.map(s=>s.date.slice(5)+' '+s.session.slice(0,1)),datasets:[{label:'Total',data:filtered.map(s=>s.total),borderColor:'#007AFF',backgroundColor:'rgba(0,122,255,0.1)',tension:0.3,fill:true,pointBackgroundColor:'#007AFF',pointRadius:4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});document.getElementById('bar-chart-title').textContent=`Class breakdown — ${sl}`;const allCls=[...new Set(filtered.flatMap(s=>Object.keys(s.classes)))];const colors=['#007AFF','#34C759','#FF9500','#FF3B30','#5E5CE6','#FF2D55','#30D158'];if(barChartInst)barChartInst.destroy();barChartInst=new Chart(document.getElementById('bar-chart'),{type:'bar',data:{labels:allCls,datasets:[{label:'Total',data:allCls.map(cls=>filtered.reduce((s,snap)=>s+(snap.classes[cls]||0),0)),backgroundColor:allCls.map((_,i)=>colors[i%colors.length]),borderRadius:4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});const hf=checkInHistory.filter(h=>h.date>=from&&h.date<=to&&(sf==='all'||h.session===sf));const counts={};hf.forEach(h=>{if(!counts[h.name])counts[h.name]={morning:0,evening:0};if(h.session==='Morning')counts[h.name].morning++;else counts[h.name].evening++;});const sorted=Object.entries(counts).sort((a,b)=>a[0].localeCompare(b[0]));const table=document.getElementById('child-attendance-table');if(!sorted.length){table.innerHTML='<div class="empty-state">No attendance data for this period.</div>';return;}table.innerHTML=`<table class="attendance-table"><thead><tr><th>Name</th>${sf==='all'?'<th>Morning</th><th>Evening</th>':''}<th>Total</th></tr></thead><tbody>${sorted.map(([name,c])=>`<tr><td>${name}</td>${sf==='all'?`<td>${c.morning||'—'}</td><td>${c.evening||'—'}</td>`:''}<td style="font-weight:600;">${c.morning+c.evening}</td></tr>`).join('')}</tbody></table>`;}
 window.generateReports=generateReports;
 
+  async function importFromSheet(){
+  if(!confirm('This will import all children from Google Sheets into Firebase. Continue?'))return;
+  setSyncStatus('syncing','Importing...');
+  try{
+    const r=await fetch('https://script.google.com/macros/s/AKfycbx_H57zt50k9ZMPPYR7oqdgjdcMdP00JJYXCDLxjZJjFU1OLh-WF6RE_D3yy5jojABh/exec?action=load');
+    const d=await r.json();
+    const ch=d.children||[];
+    for(const row of ch){
+      if(!row[0])continue;
+      const name=row[0];
+      const k=name.replace(/[.#$[\]]/g,'_');
+      await set(ref(db,'data/children/'+k),{name,bday:row[1]||'',language:row[2]||'',p1name:row[3]||'',p1phone:row[4]||'',p2name:row[5]||'',p2phone:row[6]||'',medical:row[7]||'',sn:row[8]==='TRUE',snNotes:row[9]||'',checkedIn:false,code:row[11]||Math.floor(1000+Math.random()*9000).toString(),placementCls:''});
+    }
+    setSyncStatus('ok','Import complete!');
+    alert('Import complete!');
+  }catch(e){setSyncStatus('error','Import failed');console.error(e);}
+}
+window.importFromSheet=importFromSheet;
 loadAllData();
 </script>
 </body>
