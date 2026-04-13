@@ -329,6 +329,8 @@ function getAgeMonths(b){if(!b)return null;const d=new Date(b);return(now.getFul
 function assignClass(b){if(!b)return'Unknown';const m=getAgeMonths(b);if(EV){if(m<24)return'Infant/Walkers';const d=new Date(b);if(now<new Date(d.getFullYear()+4,d.getMonth(),d.getDate()))return'Preschool';if(now<new Date(d.getFullYear()+6,d.getMonth(),d.getDate()))return'Kindergarten';const yr=now.getFullYear()-d.getFullYear();if(yr<8)return'GK1';if(yr<10)return'GK2';return'GK3';}if(m<12)return'Infant';if(m<24)return'Walkers';const d=new Date(b);if(now<new Date(d.getFullYear()+4,d.getMonth(),d.getDate()))return'Preschool';return'Kindergarten';}
 function getAge(b){if(!b)return'';const m=getAgeMonths(b);if(m===null)return'';if(m<24)return m+'mo';return Math.floor(m/12)+'y '+(m%12)+'mo';}
 function genCode(){return Math.floor(1000+Math.random()*9000).toString();}
+function getFamilyKey(c){const names=[c.p1name,c.p2name].filter(Boolean).sort();return names.length?names.join('|'):'solo_'+c.name;}
+function getFamilyMembers(c){const fk=getFamilyKey(c);return children.filter(x=>getFamilyKey(x)===fk).sort((a,b)=>a.name.localeCompare(b.name));}
 function mkCL(){return{ill:false,noSnack:false,bag:false,cup:false,noChange:false,noSit:false};}
 function fullName(n){const p=n.split(', ');if(p.length<2)return n;return p.slice(1).join(' ')+' '+p[0];}
 function toggleSnNotes(){document.getElementById('sn-notes-area').style.display=document.getElementById('reg-sn').checked?'block':'none';}
