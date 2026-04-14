@@ -475,6 +475,510 @@ window.setRegistryFilter=setRegistryFilter;window.startRegMedEdit=startRegMedEdi
 
 function renderRegistry(q){const search=(q||'').toLowerCase();renderRegistryFilterRow();const filtered=children.filter(c=>{const ms=c.name.toLowerCase().includes(search);if(registryFilter==='one-to-one')return ms&&c.sn;return registryFilter==='all'?ms:ms&&c.cls===registryFilter;}).sort((a,b)=>a.name.localeCompare(b.name));document.getElementById('registry-total').textContent=children.length;const np=n=>{const p=n.split(', ');return{last:p[0]||'',first:p.slice(1).join(', ')||''};};document.getElementById('registry-list').innerHTML=filtered.map(c=>{const i=children.indexOf(c);const ic=confirmingRemoval===i;const ie=editingIdx===i;const{last,first}=np(c.name);return `<div class="registry-item ${ic?'confirming':''} ${ie?'editing':''}"><div style="flex:1;"><div style="font-size:14px;font-weight:500;">${c.name}${c.sn?'<span class="badge badge-sn">1:1</span>':''}</div><div style="font-size:11px;color:#6E6E73;">${c.cls} · ${c.age||'No DOB'}${c.bday?' · '+c.bday.split('T')[0]:''}
 ${c.language?' · '+c.language:''}${c.medical?' · Medical':''}${c.sn?' · Special needs':''}</div>${c.sn&&c.snNotes?`<div style="font-size:11px;color:#5E5CE6;margin-top:2px;">${c.snNotes}</div>`:''}${ic?`<div style="font-size:11px;color:#CC0000;margin-top:3px;font-weight:500;">Remove ${c.name}? Cannot be undone.</div>`:''} ${ie?`<div class="edit-form"><div style="font-size:11px;font-weight:600;color:#007AFF;margin-bottom:9px;text-transform:uppercase;letter-spacing:0.5px;">Editing ${c.name}</div><div class="form-grid" style="gap:7px;margin-bottom:7px;"><div class="form-group"><label class="form-label">First name</label><input class="form-input" id="edit-first-${i}" type="text" value="${first}" style="font-size:13px;padding:7px 10px;"/></div><div class="form-group"><label class="form-label">Last name</label><input class="form-input" id="edit-last-${i}" type="text" value="${last}" style="font-size:13px;padding:7px 10px;"/></div><div class="form-group full"><label class="form-label">Date of birth</label><input class="form-input" id="edit-dob-${i}" type="date" value="${c.bday?c.bday.split('T')[0]:''}"
+ style="font-size:13px;padding:7px 10px;"/></div><div class="form-group full"><label class="form-label">Language at home</label><input class="form-input" id="edit-lang-${i}" type="text" value="${c.language||''}" style="font-size:13px;padding:7px 10px;"/></div><div class="form-group"><label class="form-label">Parent 1 name</label><input class="form-input" id="edit-p1name-${i}" type="text" value="${c.p1name||''}" style="font-size:13px;padding:7px 10px;"/></div><div class="form-group"><label class="form-label">Parent 1 phone</label><input class="form-input" id="edit-p1phone-${i}" type="tel" value="${c.p1phone||''}" style="font-size:13px;padding:7px 10px;"/></div><div class="form-group"><label class="form-label">Parent 2 name</label><input class="form-input" id="edit-p2name-${i}" type="text" value="${c.p2name||''}" style="font-size:13px;padding:7px 10px;"/></div><div class="form-group"><label class="form-label">Parent 2 phone</label><input class="form-input" id="edit-p2phone-${i}" type="tel" value="${c.p2phone||''}" style="font-size:13px;padding:7px 10px;"/></div><div class="form-group full"><label class="form-label">Medical notes</label><textarea class="form-input" id="edit-medical-${i}" rows="2" style="width:100%;font-size:13px;padding:7px 10px;">${c.medical||''}</textarea></div></div><div style="background:white;border:0.5px solid #5E5CE6;border-radius:8px;padding:9px;margin-bottom:7px;"><div style="display:flex;align-items:center;gap:7px;"><input type="checkbox" id="edit-sn-${i}" ${c.sn?'checked':''} onchange="toggleEditSn(${i})" style="width:16px;height:16px;accent-color:#5E5CE6;"/><label for="edit-sn-${i}" style="font-size:12px;">Special needs — one-to-one support</label></div><div id="edit-sn-area-${i}" style="display:${c.sn?'block':'none'};margin-top:6px;"><textarea class="form-input" id="edit-sn-notes-${i}" rows="2" style="width:100%;font-size:13px;padding:7px 10px;border-color:#5E5CE6;">${c.snNotes||''}</textarea></div></div><div style="display:flex;gap:7px;"><button class="btn primary" style="flex:1;padding:8px;" onclick="saveEdit(${i})">Save changes</button><button class="btn" style="padding:8px;" onclick="cancelEdit()">Cancel</button></div></div>`:''} ${!ie&&c.medical&&!ic&&!c.editingRegMed?`<div class="reg-medical-display">${c.medical}</div>`:''} ${c.editingRegMed?`<div class="reg-edit-form"><div style="font-size:11px;font-weight:600;color:#CC0000;margin-bottom:5px;">Medical notes</div><textarea class="medical-textarea" rows="2" oninput="updateRegDraft(${i},this.value)" style="width:100%;border-color:#FF3B30;">${c.draftMedical||''}</textarea><div class="save-row"><button class="btn small red" onclick="saveRegMed(${i})">Save</button><button class="btn small" onclick="cancelRegMedEdit(${i})">Cancel</button><span class="saved-ok" id="reg-saved-${i}">Saved.</span></div></div>`:''}</div>${!ie?`<div style="display:flex;gap:5px;flex-shrink:0;margin-top:1px;flex-direction:column;align-items:flex-end;">${ic?`<button class="btn small red" onclick="confirmRemove(${i})">Yes, remove</button><button class="btn small" onclick="cancelRemove()">Cancel</button>`:`<button class="btn small blue" onclick="startEdit(${i})">Edit</button><button class="btn small red" onclick="promptRemove(${i})">Remove</button>${!c.editingRegMed?`<button class="btn small" style="border-color:#FF3B30;color:#CC0000;" onclick="startRegMedEdit(${i})">${c.medical?'Edit note':'Add note'}</button>`:''}`}</div>`:''}</div>`;}).join('');}
+
+function generateReports(){const from=document.getElementById('report-from').value;const to=document.getElementById('report-to').value;const sf=document.getElementById('report-session').value;if(!from||!to)return;const filtered=sessionSnapshots.filter(s=>s.date>=from&&s.date<=to&&(sf==='all'||s.session===sf)).sort((a,b)=>a.date.localeCompare(b.date)||a.session.localeCompare(b.session));const sl=sf==='all'?'All sessions':sf+' only';document.getElementById('line-chart-title').textContent=`Attendance trend — ${sl}`;if(lineChartInst)lineChartInst.destroy();lineChartInst=new Chart(document.getElementById('line-chart'),{type:'line',data:{labels:filtered.map(s=>s.date.slice(5)+' '+s.session.slice(0,1)),datasets:[{label:'Total',data:filtered.map(s=>s.total),borderColor:'#007AFF',backgroundColor:'rgba(0,122,255,0.1)',tension:0.3,fill:true,pointBackgroundColor:'#007AFF',pointRadius:4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});document.getElementById('bar-chart-title').textContent=`Class breakdown — ${sl}`;const allCls=[...new Set(filtered.flatMap(s=>Object.keys(s.classes)))];const colors=['#007AFF','#34C759','#FF9500','#FF3B30','#5E5CE6','#FF2D55','#30D158'];if(barChartInst)barChartInst.destroy();barChartInst=new Chart(document.getElementById('bar-chart'),{type:'bar',data:{labels:allCls,datasets:[{label:'Total',data:allCls.map(cls=>filtered.reduce((s,snap)=>s+(snap.classes[cls]||0),0)),backgroundColor:allCls.map((_,i)=>colors[i%colors.length]),borderRadius:4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});const hf=checkInHistory.filter(h=>h.date>=from&&h.date<=to&&(sf==='all'||h.session===sf));const counts={};hf.forEach(h=>{if(!counts[h.name])counts[h.name]={morning:0,evening:0};if(h.session==='Morning')counts[h.name].morning++;else counts[h.name].evening++;});const sorted=Object.entries(counts).sort((a,b)=>a[0].localeCompare(b[0]));const table=document.getElementById('child-attendance-table');if(!sorted.length){table.innerHTML='<div class="empty-state">No attendance data for this period.</div>';return;}table.innerHTML=`<table class="attendance-table"><thead><tr><th>Name</th>${sf==='all'?'<th>Morning</th><th>Evening</th>':''}<th>Total</th></tr></thead><tbody>${sorted.map(([name,c])=>`<tr><td>${name}</td>${sf==='all'?`<td>${c.morning||'—'}</td><td>${c.evening||'—'}</td>`:''}<td style="font-weight:600;">${c.morning+c.evening}</td></tr>`).join('')}</tbody></table>`;}
+window.generateReports=generateReports;
+onValue(ref(db,'data/teachers'),snap=>{const t=snap.val()||{};Object.keys(t).forEach(k=>{if(document.activeElement.className!=='teacher-input')teachers[k]=t[k];});renderDashboard();});
+
+  async function importFromSheet(){
+  if(!confirm('This will import all children from Google Sheets into Firebase. Continue?'))return;
+  setSyncStatus('syncing','Importing...');
+  try{
+    const r=await fetch('https://script.google.com/macros/s/AKfycbx_H57zt50k9ZMPPYR7oqdgjdcMdP00JJYXCDLxjZJjFU1OLh-WF6RE_D3yy5jojABh/exec?action=load');
+    const d=await r.json();
+    const ch=d.children||[];
+    for(const row of ch){
+      if(!row[0])continue;
+      const name=row[0];
+      const k=name.replace(/[.#$[\]]/g,'_');
+      await set(ref(db,'data/children/'+k),{name,bday:row[1]||'',language:row[2]||'',p1name:row[3]||'',p1phone:row[4]||'',p2name:row[5]||'',p2phone:row[6]||'',medical:row[7]||'',sn:row[8]==='TRUE',snNotes:row[9]||'',checkedIn:false,code:row[11]||Math.floor(1000+Math.random()*9000).toString(),placementCls:''});
+    }
+    setSyncStatus('ok','Import complete!');
+    alert('Import complete!');
+  }catch(e){setSyncStatus('error','Import failed');console.error(e);}
+}
+window.importFromSheet=importFromSheet;
+loadAllData();
+</script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-title" content="Grace Kids"/>
+<title>Grace Kids Check-in</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F5F5F7;color:#1D1D1F;min-height:100vh;}
+.app{max-width:980px;margin:0 auto;padding:1rem;}
+.top-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px;}
+.app-title{font-size:18px;font-weight:600;}
+.app-date{font-size:12px;color:#6E6E73;margin-top:2px;}
+.session-badge{padding:6px 14px;border-radius:20px;font-size:12px;font-weight:500;}
+.session-morning{background:#EAF3DE;color:#27500A;}
+.session-evening{background:#E6F1FB;color:#0C447C;}
+.sync-bar{display:flex;align-items:center;gap:8px;padding:7px 12px;background:white;border-radius:10px;margin-bottom:1rem;font-size:12px;border:0.5px solid #D1D1D6;}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:#34C759;flex-shrink:0;}
+.sync-dot.syncing{background:#FF9500;}
+.sync-dot.error{background:#FF3B30;}
+.tab-bar{display:flex;gap:2px;margin-bottom:1.5rem;border-bottom:0.5px solid #D1D1D6;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.tab{padding:8px 11px;font-size:12px;cursor:pointer;border:none;background:none;color:#6E6E73;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;}
+.tab.active{color:#1D1D1F;border-bottom:2px solid #1D1D1F;font-weight:500;}
+.dashboard{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:10px;margin-bottom:1rem;}
+.class-card{background:white;border:0.5px solid #D1D1D6;border-radius:12px;padding:.9rem;cursor:pointer;}
+.class-card.over{border-color:#FF3B30;background:#FFF5F5;}
+.class-card.one-to-one{border:1.5px solid #5E5CE6;background:#F0EFFE;}
+.class-card-name{font-size:11px;color:#6E6E73;margin-bottom:3px;}
+.class-card.one-to-one .class-card-name{color:#5E5CE6;}
+.class-card-count{font-size:24px;font-weight:600;}
+.class-card-detail{font-size:11px;color:#6E6E73;margin-top:3px;}
+.teacher-row{display:flex;align-items:center;gap:6px;margin-top:7px;}
+.teacher-input{width:46px;font-size:12px;padding:3px 5px;border:0.5px solid #D1D1D6;border-radius:7px;background:#F5F5F7;text-align:center;}
+.teacher-label{font-size:10px;color:#6E6E73;}
+@keyframes flash{0%,100%{background:#FF3B30;}50%{background:#FFE5E5;}}
+.warning-box{animation:flash 1s infinite;border-radius:10px;padding:10px 14px;margin-bottom:1rem;font-size:13px;font-weight:500;color:#4D0000;border:2px solid #CC0000;}
+.search-bar{width:100%;padding:10px 14px;font-size:15px;border:0.5px solid #D1D1D6;border-radius:12px;background:white;margin-bottom:1rem;}
+.child-list{display:flex;flex-direction:column;gap:5px;}
+.child-item{background:white;border:0.5px solid #D1D1D6;border-radius:10px;overflow:hidden;}
+.child-item.checked-in{border-color:#34C759;}
+.child-item.special-needs{border-left:3px solid #5E5CE6;}
+.child-header{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;cursor:pointer;user-select:none;-webkit-user-select:none;}
+.child-item.checked-in .child-header{background:#F0FFF4;}
+.child-header-name{font-size:14px;font-weight:500;}
+.child-item.checked-in .child-header-name{color:#1A7F37;}
+.child-header-meta{font-size:11px;color:#6E6E73;margin-top:2px;}
+.child-item.checked-in .child-header-meta{color:#2D9C4A;}
+.badge{display:inline-block;font-size:9px;font-weight:600;padding:1px 5px;border-radius:99px;margin-left:4px;vertical-align:middle;}
+.badge-sn{color:#3730A3;background:#EDE9FE;}
+.badge-med{color:#7F1D1D;background:#FEE2E2;}
+.badge-in{color:#1A7F37;background:#DCFCE7;}
+.chevron{font-size:11px;color:#6E6E73;flex-shrink:0;margin-left:6px;transition:transform 0.2s;}
+.chevron.open{transform:rotate(180deg);}
+.checklist-panel{border-top:0.5px solid #D1D1D6;padding:12px;background:#F9F9FB;}
+.checklist-panel.ill{background:#FFF5F5;border-top-color:#FF3B30;}
+.ill-alert{background:#FF3B30;color:white;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:500;margin-bottom:10px;}
+.medical-section{background:white;border:0.5px solid #FF3B30;border-radius:8px;padding:10px;margin-bottom:10px;}
+.medical-section-title{font-size:11px;font-weight:600;color:#CC0000;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;}
+.medical-text{font-size:12px;color:#CC0000;line-height:1.5;margin-bottom:6px;}
+.medical-empty{font-size:12px;color:#6E6E73;font-style:italic;margin-bottom:6px;}
+.medical-textarea{width:100%;padding:7px 9px;font-size:13px;border:0.5px solid #D1D1D6;border-radius:8px;background:#F9F9FB;resize:vertical;font-family:inherit;line-height:1.5;}
+.checklist-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:10px;}
+.check-item{display:flex;align-items:center;gap:7px;padding:8px 9px;background:white;border:0.5px solid #D1D1D6;border-radius:8px;}
+.check-item input[type=checkbox]{width:18px;height:18px;cursor:pointer;flex-shrink:0;accent-color:#007AFF;}
+.check-item label{font-size:12px;cursor:pointer;line-height:1.3;}
+.check-item.ill-item{border-color:#FF3B30;background:#FFF5F5;}
+.check-item.ill-item label{color:#CC0000;}
+.check-item.flagged{border-color:#FF9500;background:#FFFBF0;}
+.check-item.flagged label{color:#7A4000;}
+.sn-row{display:flex;align-items:center;gap:8px;margin-bottom:9px;}
+.sn-select{padding:6px 9px;font-size:12px;border:0.5px solid #5E5CE6;border-radius:8px;background:#F0EFFE;color:#3730A3;}
+.btn{padding:8px 16px;font-size:13px;border:0.5px solid #D1D1D6;border-radius:8px;cursor:pointer;background:white;color:#1D1D1F;}
+.btn.primary{background:#1D1D1F;color:white;border-color:#1D1D1F;}
+.btn.green{background:#34C759;color:white;border-color:#34C759;font-weight:500;}
+.btn.red{background:#FF3B30;color:white;border-color:#FF3B30;}
+.btn.blue{background:#007AFF;color:white;border-color:#007AFF;}
+.btn.small{font-size:11px;padding:4px 9px;}
+.filter-row{display:flex;gap:5px;margin-bottom:1rem;flex-wrap:wrap;}
+.filter-btn{padding:5px 11px;font-size:11px;border:0.5px solid #D1D1D6;border-radius:99px;cursor:pointer;background:white;color:#6E6E73;}
+.filter-btn.active{background:#1D1D1F;color:white;border-color:#1D1D1F;}
+.totals-bar{display:flex;gap:16px;padding:9px 14px;background:white;border-radius:10px;margin-bottom:1rem;font-size:13px;color:#6E6E73;border:0.5px solid #D1D1D6;}
+.form-card{background:white;border:0.5px solid #D1D1D6;border-radius:12px;padding:1.1rem;margin-bottom:1rem;}
+.form-card.sn-card{border-color:#5E5CE6;background:#F0EFFE;}
+.section-title{font-size:11px;font-weight:600;color:#6E6E73;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:0;}
+.form-group{display:flex;flex-direction:column;gap:3px;}
+.form-group.full{grid-column:1/-1;}
+.form-label{font-size:11px;color:#6E6E73;font-weight:500;}
+.form-input{padding:9px 11px;font-size:14px;border:0.5px solid #D1D1D6;border-radius:8px;background:#F9F9FB;color:#1D1D1F;}
+.checkbox-row{display:flex;align-items:center;gap:9px;padding:6px 0;}
+.checkbox-row input[type=checkbox]{width:18px;height:18px;accent-color:#5E5CE6;}
+.checkbox-label{font-size:13px;}
+.success-banner{background:#DCFCE7;border:0.5px solid #34C759;border-radius:8px;padding:9px 13px;font-size:12px;color:#1A7F37;margin-bottom:1rem;display:none;}
+.medical-card{background:white;border:0.5px solid #FF3B30;border-radius:10px;padding:.9rem;margin-bottom:8px;}
+.incident-row{background:white;border:0.5px solid #D1D1D6;border-radius:10px;padding:.9rem;margin-bottom:7px;}
+.incident-date{font-size:11px;color:#6E6E73;margin-bottom:3px;}
+.incident-child{font-size:14px;font-weight:500;}
+.incident-detail{font-size:12px;color:#6E6E73;margin-top:3px;}
+.desk-note-row{border-radius:10px;padding:.9rem;margin-bottom:7px;border:0.5px solid #D1D1D6;background:white;}
+.desk-note-row.expiring{border:1.5px solid #FF9500;background:#FFFBF0;}
+.expiry-badge{display:inline-block;font-size:10px;font-weight:500;color:#7A4000;background:#FFD60A;padding:2px 7px;border-radius:99px;margin-left:6px;}
+.registry-item{display:flex;align-items:flex-start;justify-content:space-between;padding:10px 14px;background:white;border:0.5px solid #D1D1D6;border-radius:10px;margin-bottom:5px;}
+.registry-item.editing{background:#EFF6FF;border-color:#007AFF;}
+.registry-item.confirming{background:#FFF5F5;border-color:#FF3B30;}
+.edit-form{background:#F9F9FB;border-radius:8px;padding:.9rem;margin-top:9px;border:0.5px solid #007AFF;}
+.chart-container{background:white;border:0.5px solid #D1D1D6;border-radius:12px;padding:1.1rem;margin-bottom:1rem;}
+.chart-title{font-size:13px;font-weight:500;margin-bottom:.9rem;}
+.report-controls{display:flex;gap:10px;align-items:flex-end;margin-bottom:1.5rem;flex-wrap:wrap;}
+.report-controls .form-group{flex:1;min-width:110px;}
+.attendance-table{width:100%;border-collapse:collapse;font-size:12px;}
+.attendance-table th{text-align:left;padding:7px 10px;font-size:10px;font-weight:600;color:#6E6E73;text-transform:uppercase;letter-spacing:0.5px;border-bottom:0.5px solid #D1D1D6;}
+.attendance-table td{padding:7px 10px;border-bottom:0.5px solid #D1D1D6;}
+.attendance-table tr:last-child td{border-bottom:none;}
+.empty-state{text-align:center;padding:2.5rem;color:#6E6E73;font-size:13px;}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99;}
+.modal{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;border-radius:16px;padding:1.3rem;width:90%;max-width:380px;max-height:88vh;overflow-y:auto;z-index:200;box-shadow:0 20px 60px rgba(0,0,0,0.3);}
+.modal h3{font-size:16px;font-weight:600;margin-bottom:4px;}
+.modal p{font-size:12px;color:#6E6E73;margin-bottom:1rem;}
+.modal-actions{display:flex;gap:8px;margin-top:1rem;}
+.lbl-section{font-size:10px;color:#6E6E73;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px;margin-top:10px;}
+.lbl-section:first-child{margin-top:0;}
+.lbl-nametag{border:2px solid #007AFF;border-radius:10px;padding:14px;background:white;}
+.lbl-fullname{font-size:20px;font-weight:700;color:#003380;line-height:1.2;}
+.lbl-class{font-size:12px;color:#007AFF;margin-top:3px;}
+.lbl-code{font-size:24px;font-weight:700;color:#007AFF;letter-spacing:5px;margin-top:7px;font-family:monospace;}
+.lbl-divider{border-top:1px solid #B3D1FF;margin-top:9px;padding-top:7px;}
+.lbl-flags{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:5px;}
+.lbl-flag{font-size:10px;font-weight:600;padding:2px 7px;border-radius:99px;}
+.lf-ns{background:#FEE2E2;color:#991B1B;border:1px solid #FF3B30;}
+.lf-nc{background:#FFF7ED;color:#7C2D12;border:1px solid #FF9500;}
+.lf-nd{background:#EDE9FE;color:#3730A3;border:1px solid #5E5CE6;}
+.lbl-medical{font-size:11px;color:#CC0000;line-height:1.5;}
+.lbl-item{border:2px solid #34C759;border-radius:10px;padding:10px;background:white;margin-top:8px;}
+.lbl-item-type{font-size:9px;color:#1A7F37;text-transform:uppercase;letter-spacing:1px;font-weight:600;}
+.lbl-item-name{font-size:16px;font-weight:700;color:#1A7F37;margin-top:3px;}
+.lbl-security{border:2px solid #5E5CE6;border-radius:10px;padding:10px;background:white;margin-top:8px;}
+.lbl-security-label{font-size:9px;color:#3730A3;text-transform:uppercase;letter-spacing:1px;font-weight:600;}
+.lbl-security-code{font-size:22px;font-weight:700;color:#3730A3;letter-spacing:5px;font-family:monospace;margin-top:3px;}
+.popup{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;border-radius:16px;padding:1.3rem;width:90%;max-width:400px;max-height:80vh;overflow-y:auto;z-index:200;box-shadow:0 20px 60px rgba(0,0,0,0.3);}
+.popup-child-row{display:flex;align-items:flex-start;padding:8px 10px;border-radius:8px;margin-bottom:5px;background:#F9F9FB;}
+.popup-child-row.has-medical{background:#FFF5F5;border:0.5px solid #FF3B30;}
+.reg-medical-display{font-size:12px;color:#CC0000;background:#FFF5F5;padding:5px 9px;border-radius:6px;margin-top:5px;border:0.5px solid #FF3B30;}
+.reg-edit-form{margin-top:7px;background:#FFF5F5;border:0.5px solid #FF3B30;border-radius:8px;padding:9px;}
+.save-row{display:flex;gap:7px;margin-top:7px;align-items:center;}
+.saved-ok{font-size:11px;color:#1A7F37;background:#DCFCE7;border:0.5px solid #34C759;border-radius:6px;padding:3px 8px;display:none;}
+@media print{body>*{display:none !important;}#print-area{display:block !important;padding:6px;}}
+#print-area{display:none;}
+.pl-nt{border:2px solid #007AFF;border-radius:8px;padding:13px;margin-bottom:13px;page-break-inside:avoid;}
+.pl-fn{font-size:20px;font-weight:700;color:#003380;line-height:1.2;}
+.pl-cl{font-size:12px;color:#007AFF;margin-top:3px;}
+.pl-co{font-size:24px;font-weight:700;color:#007AFF;letter-spacing:5px;margin-top:7px;font-family:monospace;}
+.pl-div{border-top:1px solid #B3D1FF;margin-top:8px;padding-top:6px;}
+.pl-fl{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:5px;}
+.pl-f{font-size:10px;font-weight:600;padding:2px 7px;border-radius:99px;}
+.pf-ns{background:#FEE2E2;color:#991B1B;border:1px solid #FF3B30;}
+.pf-nc{background:#FFF7ED;color:#7C2D12;border:1px solid #FF9500;}
+.pf-nd{background:#EDE9FE;color:#3730A3;border:1px solid #5E5CE6;}
+.pl-med{font-size:11px;color:#CC0000;line-height:1.5;}
+.pl-bag{border:2px solid #34C759;border-radius:8px;padding:10px;margin-bottom:13px;page-break-inside:avoid;}
+.pl-bt{font-size:9px;color:#1A7F37;text-transform:uppercase;letter-spacing:1px;font-weight:600;}
+.pl-bn{font-size:16px;font-weight:700;color:#1A7F37;margin-top:3px;}
+.pl-sec{border:2px solid #5E5CE6;border-radius:8px;padding:10px;margin-bottom:13px;page-break-inside:avoid;}
+.pl-sl{font-size:9px;color:#3730A3;text-transform:uppercase;letter-spacing:1px;font-weight:600;}
+.pl-sc{font-size:22px;font-weight:700;color:#3730A3;letter-spacing:5px;font-family:monospace;margin-top:3px;}
+</style>
+</head>
+<body>
+<div id="print-area"></div>
+<div class="app">
+  <div class="top-bar">
+    <div><div class="app-title">Early Years / Grace Kids</div><div class="app-date" id="today-date"></div></div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button class="btn small" onclick="saveSnapshot()">Save snapshot</button>
+      <button class="btn small" onclick="importFromSheet()" style="background:#5E5CE6;color:white;border-color:#5E5CE6;">Import children</button>
+      <div id="session-badge" class="session-badge"></div>
+    </div>
+  </div>
+  <div class="sync-bar"><div class="sync-dot syncing" id="sync-dot"></div><span id="sync-status">Connecting...</span></div>
+  <div id="warning-area"></div>
+  <div class="tab-bar">
+    <button class="tab active" onclick="showTab('dashboard',this)">Dashboard</button>
+    <button class="tab" onclick="showTab('checkin',this)">Check in / out</button>
+    <button class="tab" onclick="showTab('registration',this)">Registration</button>
+    <button class="tab" onclick="showTab('medical',this)">Medical notes</button>
+    <button class="tab" onclick="showTab('incidents',this)">Incident log</button>
+    <button class="tab" onclick="showTab('desknotes',this)">Desk notes</button>
+    <button class="tab" onclick="showTab('registry',this)">Registry</button>
+    <button class="tab" onclick="showTab('reports',this)">Reports</button>
+  </div>
+  <div id="tab-dashboard"><div class="dashboard" id="class-cards"></div></div>
+  <div id="tab-checkin" style="display:none;">
+    <div class="totals-bar"><span>Checked in: <strong id="total-checked">0</strong></span><span>Registered: <strong id="total-reg">0</strong></span></div>
+    <input class="search-bar" type="search" placeholder="Search by name..." oninput="filterChildren(this.value)"/>
+    <div class="filter-row" id="filter-row"></div>
+    <p style="font-size:11px;color:#6E6E73;margin-bottom:9px;">Tap a child's name to expand. Check in shows a label preview before printing.</p>
+    <div class="child-list" id="child-list"></div>
+  </div>
+  <div id="tab-registration" style="display:none;">
+    <div class="success-banner" id="success-banner"></div>
+    <div class="form-card"><div class="section-title">Child information</div><div class="form-grid">
+      <div class="form-group"><label class="form-label">First name</label><input class="form-input" id="reg-first" type="text" placeholder="First name"/></div>
+      <div class="form-group"><label class="form-label">Last name</label><input class="form-input" id="reg-last" type="text" placeholder="Last name"/></div>
+      <div class="form-group full"><label class="form-label">Date of birth</label><input class="form-input" id="reg-dob" type="date"/></div>
+      <div class="form-group full"><label class="form-label">Language spoken at home</label><input class="form-input" id="reg-language" type="text" placeholder="e.g. English, French, Mandarin"/></div>
+    </div></div>
+    <div class="form-card"><div class="section-title">Parent / guardian 1</div><div class="form-grid">
+      <div class="form-group"><label class="form-label">Name</label><input class="form-input" id="reg-p1name" type="text" placeholder="Full name"/></div>
+      <div class="form-group"><label class="form-label">Phone</label><input class="form-input" id="reg-p1phone" type="tel" placeholder="Phone"/></div>
+    </div></div>
+    <div class="form-card"><div class="section-title">Parent / guardian 2</div><div class="form-grid">
+      <div class="form-group"><label class="form-label">Name</label><input class="form-input" id="reg-p2name" type="text" placeholder="Full name"/></div>
+      <div class="form-group"><label class="form-label">Phone</label><input class="form-input" id="reg-p2phone" type="tel" placeholder="Phone"/></div>
+    </div></div>
+<div class="form-card"><div class="section-title">Membership</div><div class="checkbox-row"><input type="checkbox" id="reg-member"/><label class="checkbox-label" for="reg-member">At least one parent/guardian is a member of Grace Fellowship Church
+</label></div></div><div class="form-card"><div class="section-title">Medical notes / allergies</div><textarea class="form-input" id="reg-medical" rows="3" placeholder="Allergies, medical conditions..." style="width:100%;"></textarea></div>
+   <div class="form-card sn-card"><div class="section-title" style="color:#5E5CE6;">Special needs</div>
+      <div class="checkbox-row"><input type="checkbox" id="reg-sn" onchange="toggleSnNotes()"/><label class="checkbox-label" for="reg-sn">This child has special needs and requires one-to-one support</label></div>
+      <div id="sn-notes-area" style="display:none;margin-top:7px;"><label class="form-label" style="color:#5E5CE6;">Special needs notes</label><textarea class="form-input" id="reg-sn-notes" rows="3" placeholder="Describe the child's needs..." style="width:100%;margin-top:3px;border-color:#5E5CE6;"></textarea></div>
+    </div>
+    <button class="btn primary" style="width:100%;padding:12px;font-size:14px;" onclick="registerChild()">Register child</button>
+  </div>
+  <div id="tab-medical" style="display:none;"><p style="font-size:12px;color:#6E6E73;margin-bottom:1rem;">Checked-in children with medical notes on file.</p><div id="medical-list"></div></div>
+  <div id="tab-incidents" style="display:none;">
+    <div class="success-banner" id="incident-banner"></div>
+    <div class="form-card"><div class="section-title">Log new incident</div><div class="form-grid">
+      <div class="form-group"><label class="form-label">Volunteer name</label><input class="form-input" id="inc-volunteer" type="text" placeholder="Your name"/></div>
+      <div class="form-group"><label class="form-label">Child</label><select class="form-input" id="inc-child"><option value="">Select child...</option></select></div>
+      <div class="form-group full"><label class="form-label">Circumstance</label><textarea class="form-input" id="inc-circumstance" rows="2" style="width:100%;" placeholder="Describe what happened..."></textarea></div>
+      <div class="form-group full"><label class="form-label">Action taken</label><textarea class="form-input" id="inc-action" rows="2" style="width:100%;" placeholder="What action was taken..."></textarea></div>
+    </div><button class="btn primary" style="margin-top:8px;width:100%;padding:9px;" onclick="logIncident()">Log incident</button></div>
+    <div id="incident-count-bar" style="font-size:12px;color:#6E6E73;margin-bottom:1rem;"></div>
+    <div id="incident-list"></div>
+  </div>
+  <div id="tab-desknotes" style="display:none;">
+    <div class="success-banner" id="desk-banner"></div>
+    <div class="form-card"><div class="section-title">Add desk note</div><div class="form-grid">
+      <div class="form-group"><label class="form-label">Volunteer</label><input class="form-input" id="desk-volunteer" type="text" placeholder="Your name"/></div>
+      <div class="form-group"><label class="form-label">Date</label><input class="form-input" id="desk-date" type="date"/></div>
+      <div class="form-group full"><label class="form-label">Note</label><textarea class="form-input" id="desk-note" rows="3" style="width:100%;" placeholder="Enter your note..."></textarea></div>
+      <div class="form-group full"><label class="form-label">Action taken (if any)</label><textarea class="form-input" id="desk-action" rows="2" style="width:100%;" placeholder="Any action taken..."></textarea></div>
+    </div><button class="btn primary" style="margin-top:8px;width:100%;padding:9px;" onclick="addDeskNote()">Save note</button></div>
+    <div id="desk-note-list"></div>
+  </div>
+  <div id="tab-registry" style="display:none;">
+    <div class="totals-bar"><span>Total registered: <strong id="registry-total">0</strong></span></div>
+    <input class="search-bar" type="search" placeholder="Search registry..." oninput="renderRegistry(this.value)" id="registry-search"/>
+    <div class="filter-row" id="registry-filter-row"></div>
+    <div id="registry-list"></div>
+  </div>
+  <div id="tab-reports" style="display:none;">
+    <div class="form-card"><div class="section-title">Filter</div><div class="report-controls">
+      <div class="form-group"><label class="form-label">From</label><input class="form-input" id="report-from" type="date"/></div>
+      <div class="form-group"><label class="form-label">To</label><input class="form-input" id="report-to" type="date"/></div>
+      <div class="form-group"><label class="form-label">Session</label><select class="form-input" id="report-session" onchange="generateReports()"><option value="all">All sessions</option><option value="Morning">Morning only</option><option value="Evening">Evening only</option></select></div>
+      <button class="btn primary" style="padding:8px 16px;align-self:flex-end;" onclick="generateReports()">Generate</button>
+    </div></div>
+    <div class="chart-container"><div class="chart-title" id="line-chart-title">Attendance trend</div><canvas id="line-chart" height="200"></canvas></div>
+    <div class="chart-container"><div class="chart-title" id="bar-chart-title">Class breakdown</div><canvas id="bar-chart" height="200"></canvas></div>
+    <div class="chart-container"><div class="chart-title">Individual child attendance — alphabetical</div><div id="child-attendance-table"></div></div>
+  </div>
+</div>
+<div class="modal-overlay" id="overlay" onclick="closeAllModals()"></div>
+<div class="popup" id="class-popup">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+    <h3 id="popup-title" style="font-size:15px;font-weight:600;"></h3>
+    <button class="btn small" onclick="closeAllModals()">Close</button>
+  </div>
+  <div id="popup-list"></div>
+</div>
+<div class="modal" id="preview-modal">
+  <h3 id="preview-title">Label preview</h3>
+  <p>Check everything looks correct then tap Print to send to the Brother printer.</p>
+  <div id="preview-content"></div>
+  <div class="modal-actions">
+    <button class="btn blue" style="flex:1;" onclick="printNow()">Print</button>
+    <button class="btn" onclick="cancelCheckin()">Cancel</button>
+  </div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getDatabase, ref, set, get, onValue } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDy303vtBM-_m5jNMBJseB3XJOm8NXTlLo",
+  authDomain: "early-years-grace-kids-reg.firebaseapp.com",
+  databaseURL: "https://early-years-grace-kids-reg-default-rtdb.firebaseio.com",
+  projectId: "early-years-grace-kids-reg",
+  storageBucket: "early-years-grace-kids-reg.firebasestorage.app",
+  messagingSenderId: "252066477182",
+  appId: "1:252066477182:web:0135f2b493d4a5fe26142f"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+const now=new Date();
+const timeVal=now.getHours()*60+now.getMinutes();
+const session=(timeVal>=8*60&&timeVal<13*60+30)?'morning':'evening';
+const EV=session==='evening';
+const EIGHT_WEEKS=8*7*24*60*60*1000;
+const MORNING_CLASSES=['Infant','Walkers','Preschool','Kindergarten'];
+const EVENING_CLASSES=['Infant/Walkers','Preschool','Kindergarten','GK1','GK2','GK3'];
+const EARLY_YEARS=['Infant','Walkers','Preschool','Kindergarten','Infant/Walkers'];
+const RATIOS={Infant:3,Walkers:3,Preschool:4,Kindergarten:6,'Infant/Walkers':3};
+const GK_MAX={GK1:24,GK2:30,GK3:30};
+const teachers={Infant:0,Walkers:0,Preschool:0,Kindergarten:0,'Infant/Walkers':0,GK1:0,GK2:0,GK3:0,'One-to-One':0};
+const MORNING_PLACEMENT=['Infant','Walkers','Preschool','Kindergarten'];
+const EVENING_PLACEMENT=['Infant/Walkers','Preschool','Kindergarten'];
+const sessionClasses=EV?EVENING_CLASSES:MORNING_CLASSES;
+const placementOptions=EV?EVENING_PLACEMENT:MORNING_PLACEMENT;
+let children=[],incidents=[],deskNotes=[],sessionSnapshots=[],checkInHistory=[];
+let currentFilter='all',currentSearch='',registryFilter='all';
+let confirmingRemoval=null,editingIdx=null,pendingCheckinIdx=null,pendingFamily=null,pendingFamilyCode=null;
+let lineChartInst=null,barChartInst=null,syncTimeout=null;
+let fbLoaded=false;
+let familyCodes={};
+function getFamilyCode(c){const fk=getFamilyKey(c).replace(/[.#$[\]|]/g,'_');const sessionKey=now.toISOString().split('T')[0]+'_'+session;const storeKey=fk+'_'+sessionKey;if(!familyCodes[storeKey]){familyCodes[storeKey]=genCode();set(ref(db,'data/familyCodes/'+storeKey),familyCodes[storeKey]);}return familyCodes[storeKey];}
+
+document.getElementById('today-date').textContent=now.toLocaleDateString('en-CA',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+document.getElementById('desk-date').value=now.toISOString().split('T')[0];
+const t30=new Date(now);t30.setDate(t30.getDate()-30);
+document.getElementById('report-from').value=t30.toISOString().split('T')[0];
+document.getElementById('report-to').value=now.toISOString().split('T')[0];
+const sb=document.getElementById('session-badge');
+sb.textContent=session==='morning'?'Morning session':'Evening session';
+sb.className='session-badge '+(session==='morning'?'session-morning':'session-evening');
+
+function getAgeMonths(b){if(!b)return null;const d=new Date(b);return(now.getFullYear()-d.getFullYear())*12+(now.getMonth()-d.getMonth());}
+function assignClass(b){if(!b)return'Unknown';const m=getAgeMonths(b);if(EV){if(m<24)return'Infant/Walkers';const d=new Date(b);if(now<new Date(d.getFullYear()+4,d.getMonth(),d.getDate()))return'Preschool';if(now<new Date(d.getFullYear()+6,d.getMonth(),d.getDate()))return'Kindergarten';const yr=now.getFullYear()-d.getFullYear();if(yr<8)return'GK1';if(yr<10)return'GK2';return'GK3';}if(m<12)return'Infant';if(m<24)return'Walkers';const d=new Date(b);if(now<new Date(d.getFullYear()+4,d.getMonth(),d.getDate()))return'Preschool';return'Kindergarten';}
+function getAge(b){if(!b)return'';const m=getAgeMonths(b);if(m===null)return'';if(m<24)return m+'mo';return Math.floor(m/12)+'y '+(m%12)+'mo';}
+function genCode(){return Math.floor(1000+Math.random()*9000).toString();}
+function getFamilyKey(c){const names=[c.p1name,c.p2name].filter(Boolean).sort();return names.length?names.join('|'):'solo_'+c.name;}
+function getFamilyMembers(c){const fk=getFamilyKey(c);return children.filter(x=>getFamilyKey(x)===fk).sort((a,b)=>a.name.localeCompare(b.name));}
+function mkCL(){return{ill:false,noSnack:false,bag:false,cup:false,noChange:false,noSit:false};}
+function fullName(n){const p=n.split(', ');if(p.length<2)return n;return p.slice(1).join(' ')+' '+p[0];}
+function toggleSnNotes(){document.getElementById('sn-notes-area').style.display=document.getElementById('reg-sn').checked?'block':'none';}
+function setSyncStatus(state,msg){const dot=document.getElementById('sync-dot');dot.className='sync-dot'+(state==='ok'?'':state==='syncing'?' syncing':' error');document.getElementById('sync-status').textContent=msg;}
+
+// ── FIREBASE SYNC ──────────────────────────────────────────────────────────
+function childToFb(c){return{name:c.name,bday:c.bday||'',language:c.language||'',p1name:c.p1name||'',p1phone:c.p1phone||'',p2name:c.p2name||'',p2phone:c.p2phone||'',medical:c.medical||'',sn:c.sn||false,snNotes:c.snNotes||'',checkedIn:c.checkedIn||false,code:c.code,placementCls:c.placementCls||'',member:c.member||false};}
+function fbToChild(k,v){return{name:v.name||'',bday:v.bday||null,language:v.language||'',p1name:v.p1name||'',p1phone:v.p1phone||'',p2name:v.p2name||'',p2phone:v.p2phone||'',medical:v.medical||'',sn:v.sn||false,snNotes:v.snNotes||'',checkedIn:v.checkedIn||false,code:v.code||genCode(),placementCls:v.placementCls||null,cls:assignClass(v.bday||null),age:getAge(v.bday||null),expanded:false,cl:mkCL(),editingMed:false,draftMedical:v.medical||'',editingRegMed:false,fbKey:k,member:v.member||false};}
+
+function loadAllData(){
+  setSyncStatus('syncing','Connecting...');
+  onValue(ref(db,'data'),snap=>{
+    const d=snap.val()||{};
+    const ch=d.children||{};
+    children=Object.entries(ch).map(([k,v])=>fbToChild(k,v)).sort((a,b)=>a.name.localeCompare(b.name));
+    incidents=Object.values(d.incidents||{}).sort((a,b)=>b.date.localeCompare(a.date));
+    deskNotes=Object.values(d.deskNotes||{}).sort((a,b)=>b.timestamp-a.timestamp);
+    sessionSnapshots=Object.values(d.snapshots||{});
+    checkInHistory=Object.values(d.checkins||{});
+    Object.assign(familyCodes,d.familyCodes||{});
+    setSyncStatus('ok',`Loaded ${children.length} children · ${new Date().toLocaleTimeString()}`);
+    if(!fbLoaded){fbLoaded=true;checkSessionReset();}
+    renderFilterRow();renderList();renderDashboard();
+  },err=>{setSyncStatus('error','Could not connect');console.error(err);});
+}
+
+function scheduleSync(){if(syncTimeout)clearTimeout(syncTimeout);setSyncStatus('syncing','Saving...');syncTimeout=setTimeout(()=>syncChild(),500);}
+
+async function syncChild(){
+  try{
+    const updates={};
+    children.forEach(c=>{
+      const k=c.fbKey||c.name.replace(/[.#$[\]]/g,'_');
+      if(!c.fbKey)c.fbKey=k;
+      updates['data/children/'+k]=childToFb(c);
+    });
+    await set(ref(db,'data/children'),Object.fromEntries(children.map(c=>[c.fbKey||c.name.replace(/[.#$[\]]/g,'_'),childToFb(c)])));
+    setSyncStatus('ok',`Saved · ${new Date().toLocaleTimeString()}`);
+  }catch(e){setSyncStatus('error','Save failed');console.error(e);}
+}
+
+async function syncIncidents(){
+  try{await set(ref(db,'data/incidents'),Object.fromEntries(incidents.map((i,idx)=>[idx.toString(),i])));}
+  catch(e){console.error(e);}
+}
+async function syncDeskNotes(){
+  try{await set(ref(db,'data/deskNotes'),Object.fromEntries(deskNotes.map((n,idx)=>[n.id||idx.toString(),n])));}
+  catch(e){console.error(e);}
+}
+async function syncSnapshots(){
+  try{
+    await set(ref(db,'data/snapshots'),Object.fromEntries(sessionSnapshots.map((s,i)=>[i.toString(),s])));
+    await set(ref(db,'data/checkins'),Object.fromEntries(checkInHistory.map((h,i)=>[i.toString(),h])));
+  }catch(e){console.error(e);}
+}
+
+function checkSessionReset(){const key=`grace-reset-${now.toISOString().split('T')[0]}-${session}`;if(localStorage.getItem(key))return;children.forEach(c=>{c.checkedIn=false;c.cl=mkCL();c.placementCls=null;});localStorage.setItem(key,'done');syncChild();}
+
+setInterval(()=>{const h=now.getHours(),m=now.getMinutes();if((h===13&&m===30)||(h===21&&m===0))saveSnapshot();},60000);
+
+async function saveSnapshot(){const ds=now.toISOString().split('T')[0];const ci=children.filter(c=>c.checkedIn);if(!ci.length){alert('No children checked in.');return;}const cc={};sessionClasses.forEach(cls=>{cc[cls]=children.filter(c=>c.cls===cls&&c.checkedIn).length;});const sl=session==='morning'?'Morning':'Evening';if(!sessionSnapshots.find(s=>s.date===ds&&s.session===sl)){sessionSnapshots.push({date:ds,session:sl,total:ci.length,classes:cc});ci.forEach(c=>checkInHistory.push({date:ds,session:sl,name:c.name}));await syncSnapshots();}alert(`Snapshot saved: ${ci.length} children.`);}
+
+function showTab(tab,btn){['dashboard','checkin','registration','medical','incidents','desknotes','registry','reports'].forEach(t=>{document.getElementById('tab-'+t).style.display=t===tab?'block':'none';});document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');if(tab==='medical')renderMedical();if(tab==='incidents'){renderIncidents();populateChildSelect();}if(tab==='dashboard')renderDashboard();if(tab==='desknotes')renderDeskNotes();if(tab==='registry'){editingIdx=null;confirmingRemoval=null;renderRegistry('');}if(tab==='reports')generateReports();}
+
+window.showTab=showTab;
+
+function filterChildren(q){currentSearch=q.toLowerCase();renderList();}
+function setFilter(f,btn){currentFilter=f;document.querySelectorAll('#filter-row .filter-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderList();}
+function renderFilterRow(){document.getElementById('filter-row').innerHTML=['all',...sessionClasses,'one-to-one','checked'].map(f=>`<button class="filter-btn ${f==='all'?'active':''}" onclick="setFilter('${f}',this)">${f==='all'?'All':f==='checked'?'Checked in':f==='one-to-one'?'One-to-one':f}</button>`).join('');}
+function toggleExpand(i){children[i].expanded=!children[i].expanded;if(children[i].expanded)children[i].draftMedical=children[i].medical;renderList();}
+function setCheck(i,field,val){children[i].cl[field]=val;renderList();}
+function setPlacement(i,val){children[i].placementCls=val;}
+function startMedEdit(i){children[i].editingMed=true;children[i].draftMedical=children[i].medical;renderList();}
+function cancelMedEdit(i){children[i].editingMed=false;renderList();}
+function updateDraft(i,val){children[i].draftMedical=val;}
+function saveMed(i){children[i].medical=children[i].draftMedical.trim();children[i].editingMed=false;renderList();scheduleSync();const b=document.getElementById(`ci-saved-${i}`);if(b){b.style.display='block';setTimeout(()=>b.style.display='none',2000);}}
+
+window.filterChildren=filterChildren;window.setFilter=setFilter;window.toggleExpand=toggleExpand;window.setCheck=setCheck;window.setPlacement=setPlacement;window.startMedEdit=startMedEdit;window.cancelMedEdit=cancelMedEdit;window.updateDraft=updateDraft;window.saveMed=saveMed;window.toggleSnNotes=toggleSnNotes;
+
+function buildFamilyPreviewHTML(members,code){let h='';members.forEach((c,idx)=>{const fn=fullName(c.name);const dc=c.sn&&c.placementCls?c.placementCls+' (1:1)':c.cls;const cl=c.cl||mkCL();h+=`<div style="background:white;border:0.5px solid #D1D1D6;border-radius:10px;padding:12px;margin-bottom:10px;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;"><input type="checkbox" id="fam-cb-${idx}" checked style="width:18px;height:18px;accent-color:#007AFF;flex-shrink:0;"/><div><div style="font-size:14px;font-weight:600;">${fn}</div><div style="font-size:11px;color:#6E6E73;">${dc}</div></div></div>${c.medical?`<div style="font-size:12px;color:#CC0000;background:#FFF5F5;padding:7px 9px;border-radius:6px;margin-bottom:8px;border:0.5px solid #FF3B30;"><strong>Medical:</strong> ${c.medical}</div>`:''}<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;"><div style="display:flex;align-items:center;gap:6px;padding:7px 8px;background:#FFF5F5;border:0.5px solid #FF3B30;border-radius:7px;"><input type="checkbox" id="fam-ill-${idx}" ${cl.ill?'checked':''} onchange="famSetCheck(${idx},'ill',this.checked)" style="width:16px;height:16px;accent-color:#FF3B30;"/><label for="fam-ill-${idx}" style="font-size:11px;color:#CC0000;">Ill in last 48hrs?</label></div><div style="display:flex;align-items:center;gap:6px;padding:7px 8px;background:#F9F9FB;border:0.5px solid #D1D1D6;border-radius:7px;"><input type="checkbox" id="fam-ns-${idx}" ${cl.noSnack?'checked':''} onchange="famSetCheck(${idx},'noSnack',this.checked)" style="width:16px;height:16px;accent-color:#007AFF;"/><label for="fam-ns-${idx}" style="font-size:11px;">No Snack</label></div><div style="display:flex;align-items:center;gap:6px;padding:7px 8px;background:#F9F9FB;border:0.5px solid #D1D1D6;border-radius:7px;"><input type="checkbox" id="fam-bag-${idx}" ${cl.bag?'checked':''} onchange="famSetCheck(${idx},'bag',this.checked)" style="width:16px;height:16px;accent-color:#007AFF;"/><label for="fam-bag-${idx}" style="font-size:11px;">Has a Bag</label></div><div style="display:flex;align-items:center;gap:6px;padding:7px 8px;background:#F9F9FB;border:0.5px solid #D1D1D6;border-radius:7px;"><input type="checkbox" id="fam-cup-${idx}" ${cl.cup?'checked':''} onchange="famSetCheck(${idx},'cup',this.checked)" style="width:16px;height:16px;accent-color:#007AFF;"/><label for="fam-cup-${idx}" style="font-size:11px;">Has a Cup</label></div><div style="display:flex;align-items:center;gap:6px;padding:7px 8px;background:#F9F9FB;border:0.5px solid #D1D1D6;border-radius:7px;"><input type="checkbox" id="fam-nc-${idx}" ${cl.noChange?'checked':''} onchange="famSetCheck(${idx},'noChange',this.checked)" style="width:16px;height:16px;accent-color:#FF9500;"/><label for="fam-nc-${idx}" style="font-size:11px;">Do NOT Change</label></div><div style="display:flex;align-items:center;gap:6px;padding:7px 8px;background:#F9F9FB;border:0.5px solid #D1D1D6;border-radius:7px;"><input type="checkbox" id="fam-nd-${idx}" ${cl.noSit?'checked':''} onchange="famSetCheck(${idx},'noSit',this.checked)" style="width:16px;height:16px;accent-color:#5E5CE6;"/><label for="fam-nd-${idx}" style="font-size:11px;">Does Not Sit</label></div></div></div>`;});h+=`<div class="lbl-security" style="margin-top:12px;"><div class="lbl-security-label">Family security tag</div><div class="lbl-security-code">${code}</div></div>`;return h;}
+function buildPreviewHTML(i){const k=children[i];const cl=k.cl;const fn=fullName(k.name);const dc=k.sn&&k.placementCls?k.placementCls+' (1:1)':k.cls;const hasX=cl.noSnack||cl.noChange||cl.noSit||k.medical;const flags=[];if(cl.noSnack)flags.push('<span class="lbl-flag lf-ns">No Snack</span>');if(cl.noChange)flags.push('<span class="lbl-flag lf-nc">Do NOT Change</span>');if(cl.noSit)flags.push('<span class="lbl-flag lf-nd">Does Not Sit</span>');let h=`<div class="lbl-section">Name tag</div><div class="lbl-nametag"><div class="lbl-fullname">${fn}</div><div class="lbl-class">${dc}</div><div class="lbl-code">${k.code}</div>${hasX?`<div class="lbl-divider">${flags.length?`<div class="lbl-flags">${flags.join('')}</div>`:''}${k.medical?`<div class="lbl-medical"><strong>Medical:</strong> ${k.medical}</div>`:''}</div>`:''}</div>`;if(cl.bag)h+=`<div class="lbl-item"><div class="lbl-item-type">Bag</div><div class="lbl-item-name">${fn}</div></div>`;if(cl.cup)h+=`<div class="lbl-item"><div class="lbl-item-type">Cup / Bottle</div><div class="lbl-item-name">${fn}</div></div>`;h+=`<div class="lbl-security"><div class="lbl-security-label">Parent security tag</div><div class="lbl-security-code">${k.code}</div></div>`;return h;}
+function buildPrintHTML(i,overrideCode){const k=children[i];const cl=k.cl;const fn=fullName(k.name);const dc=k.sn&&k.placementCls?k.placementCls+' (1:1)':k.cls;const code=overrideCode||k.code;const hasX=cl.noSnack||cl.noChange||cl.noSit||k.medical;const flags=[];if(cl.noSnack)flags.push('<span class="pl-f pf-ns">No Snack</span>');if(cl.noChange)flags.push('<span class="pl-f pf-nc">Do NOT Change</span>');if(cl.noSit)flags.push('<span class="pl-f pf-nd">Does Not Sit</span>');let h=`<div class="pl-nt"><div class="pl-fn">${fn}</div><div class="pl-cl">${dc}</div><div class="pl-co">${code}</div>${hasX?`<div class="pl-div">${flags.length?`<div class="pl-fl">${flags.join('')}</div>`:''}${k.medical?`<div class="pl-med"><strong>Medical:</strong> ${k.medical}</div>`:''}</div>`:''}</div>`;if(cl.bag)h+=`<div class="pl-bag"><div class="pl-bt">Bag</div><div class="pl-bn">${fn}</div></div>`;if(cl.cup)h+=`<div class="pl-bag"><div class="pl-bt">Cup / Bottle</div><div class="pl-bn">${fn}</div></div>`;return h;}
+
+function doCheckin(i){const wasIn=children[i].checkedIn;if(!wasIn){const members=getFamilyMembers(children[i]);const code=getFamilyCode(children[i]);members.forEach(m=>m.pendingCheckin=true);pendingFamily=members;pendingFamilyCode=code;document.getElementById('preview-title').textContent=members.length>1?`Family check-in — ${members[0].name.split(', ')[0]}`:`Labels for ${fullName(children[i].name)}`;document.getElementById('preview-content').innerHTML=buildFamilyPreviewHTML(members,code);document.getElementById('preview-modal').style.display='block';document.getElementById('overlay').style.display='block';}else{children[i].checkedIn=false;children[i].cl=mkCL();children[i].placementCls=null;children[i].editingMed=false;renderList();scheduleSync();}}
+function famSetCheck(idx,field,val){if(pendingFamily&&pendingFamily[idx]){pendingFamily[idx].cl[field]=val;}}
+window.famSetCheck=famSetCheck;
+function cancelCheckin(){if(pendingFamily){pendingFamily.forEach(m=>m.pendingCheckin=false);pendingFamily=null;pendingFamilyCode=null;}if(pendingCheckinIdx!==null){children[pendingCheckinIdx].checkedIn=false;renderList();scheduleSync();pendingCheckinIdx=null;}document.getElementById('preview-modal').style.display='none';document.getElementById('overlay').style.display='none';}
+function printNow(){if(pendingFamily){const selected=pendingFamily.filter((_,idx)=>document.getElementById('fam-cb-'+idx)?.checked);selected.forEach(c=>{c.checkedIn=true;c.code=pendingFamilyCode;});renderList();scheduleSync();let html='';selected.forEach(c=>{const i=children.indexOf(c);html+=buildPrintHTML(i,pendingFamilyCode);});html+=`<div class="pl-sec"><div class="pl-sl">Family security tag</div><div class="pl-sc">${pendingFamilyCode}</div></div>`;document.getElementById('print-area').innerHTML=html;pendingFamily=null;pendingFamilyCode=null;document.getElementById('preview-modal').style.display='none';document.getElementById('overlay').style.display='none';setTimeout(()=>window.print(),100);return;}let i=pendingCheckinIdx;if(i===null)return;const isReprint=i<0;if(isReprint)i=-(i+1);document.getElementById('print-area').innerHTML=buildPrintHTML(i);document.getElementById('preview-modal').style.display='none';document.getElementById('overlay').style.display='none';pendingCheckinIdx=null;setTimeout(()=>window.print(),100);}
+function reprintLabels(i){pendingCheckinIdx=-(i+1);document.getElementById('preview-title').textContent=`Reprint labels for ${fullName(children[i].name)}`;document.getElementById('preview-content').innerHTML=buildPreviewHTML(i);document.getElementById('preview-modal').style.display='block';document.getElementById('overlay').style.display='block';}
+
+window.doCheckin=doCheckin;window.cancelCheckin=cancelCheckin;window.printNow=printNow;window.reprintLabels=reprintLabels;window.saveSnapshot=saveSnapshot;
+
+function renderList(){const list=document.getElementById('child-list');let filtered=children.filter(c=>{const ms=c.name.toLowerCase().includes(currentSearch);if(currentFilter==='all')return ms;if(currentFilter==='checked')return ms&&c.checkedIn;if(currentFilter==='one-to-one')return ms&&c.sn;return ms&&c.cls===currentFilter;}).sort((a,b)=>a.name.localeCompare(b.name));document.getElementById('total-checked').textContent=children.filter(c=>c.checkedIn).length;document.getElementById('total-reg').textContent=children.length;list.innerHTML=filtered.map(c=>{const i=children.indexOf(c);const cl=c.cl;return `<div class="child-item ${c.checkedIn?'checked-in':''} ${c.sn?'special-needs':''}"><div class="child-header" onclick="toggleExpand(${i})"><div style="flex:1;min-width:0;"><div class="child-header-name">${c.name}${c.sn?'<span class="badge badge-sn">1:1</span>':''}${c.medical?'<span class="badge badge-med">Medical</span>':''}${c.checkedIn?'<span class="badge badge-in">✓ in</span>':''}</div><div class="child-header-meta">${c.cls} · ${c.age||'No DOB'}${c.checkedIn&&cl.bag?' · Bag':''}${c.checkedIn&&cl.cup?' · Cup':''}${c.checkedIn&&cl.noSnack?' · No Snack':''}${c.checkedIn&&cl.noChange?' · No Change':''}${c.checkedIn&&cl.noSit?' · No Sit':''}</div></div><div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">${c.checkedIn?`<button class="btn small" onclick="event.stopPropagation();reprintLabels(${i})">Reprint</button>`:''}<span class="chevron ${c.expanded?'open':''}">▼</span></div></div>${c.expanded?`<div class="checklist-panel ${cl.ill?'ill':''}"><div class="medical-section"><div class="medical-section-title">Medical notes</div>${c.editingMed?`<textarea class="medical-textarea" rows="3" oninput="updateDraft(${i},this.value)">${c.draftMedical||''}</textarea><div class="save-row"><button class="btn small red" onclick="saveMed(${i})">Save</button><button class="btn small" onclick="cancelMedEdit(${i})">Cancel</button><span class="saved-ok" id="ci-saved-${i}">Saved.</span></div>`:`${c.medical?`<div class="medical-text">${c.medical}</div>`:`<div class="medical-empty">No medical notes on file.</div>`}<button class="btn small" style="border-color:#FF3B30;color:#CC0000;" onclick="startMedEdit(${i})">${c.medical?'Edit note':'Add note'}</button><span class="saved-ok" id="ci-saved-${i}" style="display:none;">Saved.</span>`}</div>${cl.ill?`<div class="ill-alert">⚠ This child has been ill in the last 48 hours. Please speak with the parent before checking in.</div>`:''} ${c.sn&&!c.checkedIn?`<div class="sn-row"><label style="font-size:11px;color:#5E5CE6;font-weight:600;">Class today:</label><select class="sn-select" onchange="setPlacement(${i},this.value)"><option value="">Select...</option>${placementOptions.map(p=>`<option value="${p}" ${c.placementCls===p?'selected':''}>${p}</option>`).join('')}</select></div>`:''}<div class="checklist-grid"><div class="check-item ${cl.ill?'ill-item':''}"><input type="checkbox" id="ill_${i}" ${cl.ill?'checked':''} onchange="setCheck(${i},'ill',this.checked)"/><label for="ill_${i}">Ill in last 48 hours?</label></div><div class="check-item ${cl.noSnack?'flagged':''}"><input type="checkbox" id="ns_${i}" ${cl.noSnack?'checked':''} onchange="setCheck(${i},'noSnack',this.checked)"/><label for="ns_${i}">No Snack</label></div><div class="check-item"><input type="checkbox" id="bag_${i}" ${cl.bag?'checked':''} onchange="setCheck(${i},'bag',this.checked)"/><label for="bag_${i}">Has a Bag</label></div><div class="check-item"><input type="checkbox" id="cup_${i}" ${cl.cup?'checked':''} onchange="setCheck(${i},'cup',this.checked)"/><label for="cup_${i}">Has a Cup / Bottle</label></div><div class="check-item ${cl.noChange?'flagged':''}"><input type="checkbox" id="nc_${i}" ${cl.noChange?'checked':''} onchange="setCheck(${i},'noChange',this.checked)"/><label for="nc_${i}">Do NOT Change</label></div><div class="check-item ${cl.noSit?'flagged':''}"><input type="checkbox" id="nd_${i}" ${cl.noSit?'checked':''} onchange="setCheck(${i},'noSit',this.checked)"/><label for="nd_${i}">Does Not Sit</label></div></div><div style="display:flex;gap:8px;"><button class="btn ${c.checkedIn?'red':'green'}" onclick="doCheckin(${i})">${c.checkedIn?'Check out':'Check in and print labels'}</button></div></div>`:''}</div>`;}).join('');renderDashboard();}
+
+function renderDashboard(){const allW=[];const regular=sessionClasses.map(cls=>{const all=children.filter(c=>c.cls===cls&&c.checkedIn).length;const rc=children.filter(c=>!c.sn&&c.cls===cls&&c.checkedIn).length;const sn=children.filter(c=>c.sn&&c.checkedIn&&(c.placementCls===cls||(c.cls===cls&&!c.placementCls))).length;const tot=children.filter(c=>c.cls===cls).length;const t=teachers[cls]||0;let over=false;if(EARLY_YEARS.includes(cls)){const ratio=RATIOS[cls];const max=t*ratio;const re=rc>0&&t>0&&rc>max;const nt=rc>0&&t===0;over=re||nt;if(re)allW.push(`${cls}: over ratio`);if(nt)allW.push(`${cls}: no teachers`);return `<div class="class-card ${over?'over':''}" onclick="openClassPopup('${cls}')"><div class="class-card-name">${cls} · tap</div><div class="class-card-count">${all} <span style="font-size:14px;font-weight:400;">in</span></div><div class="class-card-detail">${tot} reg · 1:${ratio}${sn>0?` · ${sn} 1:1`:''}</div><div class="teacher-row" onclick="event.stopPropagation()"><input class="teacher-input" type="number" min="0" value="${t}" onchange="setTeachers('${cls}',this.value)"/><span class="teacher-label">${t>0?rc+'/'+(t*ratio)+' cap':'Set teachers'}</span></div>${over?`<div style="font-size:10px;color:#CC0000;font-weight:600;margin-top:3px;">${re?'Over ratio':'No teachers'}</div>`:''}</div>`;}else{const max=GK_MAX[cls];const oc=rc>0&&rc>max;const tf=rc>0&&t<2;over=oc||tf;if(oc)allW.push(`${cls}: over cap`);if(tf)allW.push(`${cls}: <2 teachers`);return `<div class="class-card ${over?'over':''}" onclick="openClassPopup('${cls}')"><div class="class-card-name">${cls} · tap</div><div class="class-card-count">${all} <span style="font-size:14px;font-weight:400;">in</span></div><div class="class-card-detail">${tot} reg · Max ${max}${sn>0?` · ${sn} 1:1`:''}</div><div class="teacher-row" onclick="event.stopPropagation()"><input class="teacher-input" type="number" min="0" value="${t}" onchange="setTeachers('${cls}',this.value)"/><span class="teacher-label">${t} teachers · min 2</span></div>${over?`<div style="font-size:10px;color:#CC0000;font-weight:600;margin-top:3px;">${oc?'Over cap':''}${oc&&tf?' · ':''}${tf?'Min 2':''}</div>`:''}</div>`;}}).join('');const snCI=children.filter(c=>c.sn&&c.checkedIn).length;const snT=teachers['One-to-One']||0;const snTF=snCI>0&&snT<2;if(snTF)allW.push('One-to-one: <2 workers');document.getElementById('class-cards').innerHTML=regular+`<div class="class-card one-to-one ${snTF?'over':''}" onclick="openClassPopup('One-to-One')"><div class="class-card-name" style="color:#5E5CE6;">One-to-one · tap</div><div class="class-card-count">${snCI} <span style="font-size:14px;font-weight:400;">in</span></div><div class="class-card-detail">${children.filter(c=>c.sn).length} reg · min 2 workers</div><div class="teacher-row" onclick="event.stopPropagation()"><input class="teacher-input" type="number" min="0" value="${snT}" onchange="setTeachers('One-to-One',this.value)" style="border-color:#5E5CE6;"/><span class="teacher-label">${snT} workers · min 2</span></div>${snTF?`<div style="font-size:10px;color:#CC0000;font-weight:600;margin-top:3px;">Min 2 required</div>`:''}</div>`;document.getElementById('warning-area').innerHTML=allW.length?`<div class="warning-box">⚠ ${allW.join(' · ')}</div>`:'';}
+
+function openClassPopup(cls){let inClass=cls==='One-to-One'?children.filter(c=>c.sn&&c.checkedIn):children.filter(c=>{if(!c.checkedIn)return false;if(c.sn)return c.placementCls===cls||(!c.placementCls&&c.cls===cls);return c.cls===cls;});inClass=inClass.sort((a,b)=>{if(a.medical&&!b.medical)return-1;if(!a.medical&&b.medical)return 1;return a.name.localeCompare(b.name);});document.getElementById('popup-title').textContent=`${cls} — ${inClass.length} checked in`;document.getElementById('popup-list').innerHTML=inClass.length?inClass.map(c=>`<div class="popup-child-row ${c.medical?'has-medical':''}"><div><div style="font-size:13px;font-weight:500;color:${c.medical?'#CC0000':'#1D1D1F'};">${c.name}${c.sn?'<span class="badge badge-sn">1:1</span>':''}${c.medical?'<span class="badge badge-med">Medical</span>':''}</div>${c.medical?`<div style="font-size:11px;color:#CC0000;margin-top:2px;">${c.medical}</div>`:''}<div style="font-size:11px;color:#6E6E73;">${c.age||'No DOB'}${c.sn&&c.placementCls?' · '+c.placementCls:''}</div></div></div>`).join(''):'<div style="padding:1rem;color:#6E6E73;font-size:13px;">No children in this class.</div>';document.getElementById('class-popup').style.display='block';document.getElementById('overlay').style.display='block';}
+function setTeachers(cls,val){teachers[cls]=Math.max(0,parseInt(val)||0);set(ref(db,'data/teachers/'+cls),teachers[cls]);renderDashboard();}
+
+function closeAllModals(){document.getElementById('class-popup').style.display='none';document.getElementById('overlay').style.display='none';if(document.getElementById('preview-modal').style.display==='block')cancelCheckin();document.getElementById('preview-modal').style.display='none';}
+
+window.openClassPopup=openClassPopup;window.setTeachers=setTeachers;window.closeAllModals=closeAllModals;
+
+async function registerChild(){const first=document.getElementById('reg-first').value.trim();const last=document.getElementById('reg-last').value.trim();if(!first||!last){alert('Please enter first and last name.');return;}const dob=document.getElementById('reg-dob').value;const sn=document.getElementById('reg-sn').checked;const member=document.getElementById('reg-member').checked;const nc={name:last+', '+first,bday:dob||null,language:document.getElementById('reg-language').value.trim(),p1name:document.getElementById('reg-p1name').value.trim(),p1phone:document.getElementById('reg-p1phone').value.trim(),p2name:document.getElementById('reg-p2name').value.trim(),p2phone:document.getElementById('reg-p2phone').value.trim(),medical:document.getElementById('reg-medical').value.trim(),sn,snNotes:sn?document.getElementById('reg-sn-notes').value.trim():'',cls:assignClass(dob||null),age:getAge(dob),checkedIn:false,code:genCode(),placementCls:null,expanded:false,cl:mkCL(),editingMed:false,draftMedical:'',editingRegMed:false,member};const k=nc.name.replace(/[.#$[\]]/g,'_');nc.fbKey=k;children.push(nc);await set(ref(db,'data/children/'+k),childToFb(nc));['reg-first','reg-last','reg-dob','reg-language','reg-p1name','reg-p1phone','reg-p2name','reg-p2phone','reg-medical','reg-sn-notes'].forEach(id=>{document.getElementById(id).value='';});document.getElementById('reg-sn').checked=false;document.getElementById('reg-member').checked=false;document.getElementById('sn-notes-area').style.display='none';const b=document.getElementById('success-banner');b.textContent=`${nc.name} registered${sn?' as one-to-one':' in '+nc.cls}.`;b.style.display='block';setTimeout(()=>b.style.display='none',3000);}
+
+window.registerChild=registerChild;
+
+function renderMedical(){const w=children.filter(c=>c.checkedIn&&c.medical);document.getElementById('medical-list').innerHTML=w.length?w.map(c=>`<div class="medical-card"><div style="font-size:14px;font-weight:500;">${c.name}${c.sn?'<span class="badge badge-sn">1:1</span>':''}</div><div style="font-size:11px;color:#6E6E73;">${c.cls} · ${c.age}</div><div style="font-size:12px;color:#CC0000;background:#FFF5F5;padding:7px 9px;border-radius:6px;margin-top:5px;">${c.medical}</div>${c.p1name?`<div style="font-size:11px;color:#6E6E73;margin-top:5px;">P1: ${c.p1name}${c.p1phone?' · '+c.p1phone:''}</div>`:''}${c.p2name?`<div style="font-size:11px;color:#6E6E73;">P2: ${c.p2name}${c.p2phone?' · '+c.p2phone:''}</div>`:''}</div>`).join(''):'<div class="empty-state">No checked-in children with medical notes on file.</div>';}
+
+function populateChildSelect(){document.getElementById('inc-child').innerHTML='<option value="">Select child...</option>'+[...children].sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.name}">${c.name}</option>`).join('');}
+
+async function logIncident(){const vol=document.getElementById('inc-volunteer').value.trim();const child=document.getElementById('inc-child').value;const circ=document.getElementById('inc-circumstance').value.trim();const act=document.getElementById('inc-action').value.trim();if(!vol||!child||!circ){alert('Please fill in volunteer name, child, and circumstance.');return;}incidents.unshift({date:now.toISOString().split('T')[0],session:session==='morning'?'Morning':'Evening',volunteer:vol,child,circumstance:circ,action:act});['inc-volunteer','inc-circumstance','inc-action'].forEach(id=>{document.getElementById(id).value='';});document.getElementById('inc-child').value='';const b=document.getElementById('incident-banner');b.textContent='Incident logged.';b.style.display='block';setTimeout(()=>b.style.display='none',3000);await syncIncidents();renderIncidents();}
+function renderIncidents(){document.getElementById('incident-count-bar').textContent=`${incidents.length} incident${incidents.length!==1?'s':''} on record`;document.getElementById('incident-list').innerHTML=incidents.length?incidents.map(i=>`<div class="incident-row"><div class="incident-date">${i.date} · ${i.session} · ${i.volunteer}</div><div class="incident-child">${i.child}</div><div class="incident-detail"><strong>Circumstance:</strong> ${i.circumstance}</div>${i.action?`<div class="incident-detail"><strong>Action:</strong> ${i.action}</div>`:''}</div>`).join(''):'<div class="empty-state">No incidents logged.</div>';}
+window.logIncident=logIncident;
+
+function daysRemaining(ts){return Math.ceil((ts+EIGHT_WEEKS-now.getTime())/(1000*60*60*24));}
+function isExpiring(ts){const d=daysRemaining(ts);return d>0&&d<=7;}
+function isExpired(ts){return daysRemaining(ts)<=0;}
+
+async function addDeskNote(){const vol=document.getElementById('desk-volunteer').value.trim();const dv=document.getElementById('desk-date').value;const note=document.getElementById('desk-note').value.trim();const act=document.getElementById('desk-action').value.trim();if(!vol||!dv||!note){alert('Please fill in volunteer name, date, and note.');return;}deskNotes.unshift({id:Date.now().toString(),volunteer:vol,date:dv,timestamp:new Date(dv).getTime(),note,action:act});['desk-volunteer','desk-note','desk-action'].forEach(id=>{document.getElementById(id).value='';});document.getElementById('desk-date').value=now.toISOString().split('T')[0];const b=document.getElementById('desk-banner');b.textContent='Note saved.';b.style.display='block';setTimeout(()=>b.style.display='none',3000);await syncDeskNotes();renderDeskNotes();}
+function renderDeskNotes(){const active=deskNotes.filter(n=>!isExpired(n.timestamp)).sort((a,b)=>b.timestamp-a.timestamp);document.getElementById('desk-note-list').innerHTML=active.length?active.map(n=>{const ex=isExpiring(n.timestamp);const d=daysRemaining(n.timestamp);return`<div class="desk-note-row ${ex?'expiring':''}"><div style="font-size:11px;color:#6E6E73;">${n.date} · ${n.volunteer}${ex?`<span class="expiry-badge">Expires in ${d} day${d!==1?'s':''}</span>`:''}</div><div style="font-size:13px;margin-top:3px;">${n.note}</div>${n.action?`<div style="font-size:12px;color:#6E6E73;margin-top:3px;"><strong>Action:</strong> ${n.action}</div>`:''}</div>`;}).join(''):'<div class="empty-state">No desk notes on file.</div>';}
+window.addDeskNote=addDeskNote;
+
+function renderRegistryFilterRow(){document.getElementById('registry-filter-row').innerHTML=['all',...sessionClasses,'one-to-one'].map(f=>`<button class="filter-btn ${f===registryFilter?'active':''}" onclick="setRegistryFilter('${f}',this)">${f==='all'?'All':f==='one-to-one'?'One-to-one':f}</button>`).join('');}
+function setRegistryFilter(f,btn){registryFilter=f;document.querySelectorAll('#registry-filter-row .filter-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderRegistry(document.getElementById('registry-search').value);}
+function startRegMedEdit(i){children[i].editingRegMed=true;children[i].draftMedical=children[i].medical;renderRegistry(document.getElementById('registry-search').value);}
+function cancelRegMedEdit(i){children[i].editingRegMed=false;renderRegistry(document.getElementById('registry-search').value);}
+function updateRegDraft(i,val){children[i].draftMedical=val;}
+function saveRegMed(i){children[i].medical=children[i].draftMedical.trim();children[i].editingRegMed=false;scheduleSync();renderRegistry(document.getElementById('registry-search').value);const b=document.getElementById(`reg-saved-${i}`);if(b){b.style.display='block';setTimeout(()=>b.style.display='none',2000);}}
+function startEdit(i){editingIdx=i;confirmingRemoval=null;renderRegistry(document.getElementById('registry-search').value);}
+function cancelEdit(){editingIdx=null;renderRegistry(document.getElementById('registry-search').value);}
+function toggleEditSn(i){const cb=document.getElementById(`edit-sn-${i}`);const a=document.getElementById(`edit-sn-area-${i}`);if(a)a.style.display=cb.checked?'block':'none';}
+function saveEdit(i){const first=document.getElementById(`edit-first-${i}`).value.trim();const last=document.getElementById(`edit-last-${i}`).value.trim();if(!first||!last){alert('First and last name required.');return;}const dob=document.getElementById(`edit-dob-${i}`).value;const sn=document.getElementById(`edit-sn-${i}`).checked;children[i].name=last+', '+first;children[i].bday=dob||null;children[i].age=getAge(dob||null);children[i].cls=assignClass(dob||null);children[i].language=document.getElementById(`edit-lang-${i}`).value.trim();children[i].p1name=document.getElementById(`edit-p1name-${i}`).value.trim();children[i].p1phone=document.getElementById(`edit-p1phone-${i}`).value.trim();children[i].p2name=document.getElementById(`edit-p2name-${i}`).value.trim();children[i].p2phone=document.getElementById(`edit-p2phone-${i}`).value.trim();children[i].medical=document.getElementById(`edit-medical-${i}`).value.trim();children[i].sn=sn;children[i].snNotes=sn?(document.getElementById(`edit-sn-notes-${i}`)?.value.trim()||''):'';editingIdx=null;scheduleSync();renderRegistry(document.getElementById('registry-search').value);renderList();renderDashboard();}
+function promptRemove(i){confirmingRemoval=i;editingIdx=null;renderRegistry(document.getElementById('registry-search').value);}
+function cancelRemove(){confirmingRemoval=null;renderRegistry(document.getElementById('registry-search').value);}
+function confirmRemove(i){children.splice(i,1);confirmingRemoval=null;scheduleSync();renderRegistry(document.getElementById('registry-search').value);renderList();renderDashboard();}
+
+window.setRegistryFilter=setRegistryFilter;window.startRegMedEdit=startRegMedEdit;window.cancelRegMedEdit=cancelRegMedEdit;window.updateRegDraft=updateRegDraft;window.saveRegMed=saveRegMed;window.startEdit=startEdit;window.cancelEdit=cancelEdit;window.toggleEditSn=toggleEditSn;window.saveEdit=saveEdit;window.promptRemove=promptRemove;window.cancelRemove=cancelRemove;window.confirmRemove=confirmRemove;
+
+function renderRegistry(q){const search=(q||'').toLowerCase();renderRegistryFilterRow();const filtered=children.filter(c=>{const ms=c.name.toLowerCase().includes(search);if(registryFilter==='one-to-one')return ms&&c.sn;return registryFilter==='all'?ms:ms&&c.cls===registryFilter;}).sort((a,b)=>a.name.localeCompare(b.name));document.getElementById('registry-total').textContent=children.length;const np=n=>{const p=n.split(', ');return{last:p[0]||'',first:p.slice(1).join(', ')||''};};document.getElementById('registry-list').innerHTML=filtered.map(c=>{const i=children.indexOf(c);const ic=confirmingRemoval===i;const ie=editingIdx===i;const{last,first}=np(c.name);return `<div class="registry-item ${ic?'confirming':''} ${ie?'editing':''}"><div style="flex:1;"><div style="font-size:14px;font-weight:500;">${c.name}${c.sn?'<span class="badge badge-sn">1:1</span>':''}</div><div style="font-size:11px;color:#6E6E73;">${c.cls} · ${c.age||'No DOB'}${c.bday?' · '+c.bday.split('T')[0]:''}
+${c.language?' · '+c.language:''}${c.medical?' · Medical':''}${c.sn?' · Special needs':''}</div>${c.sn&&c.snNotes?`<div style="font-size:11px;color:#5E5CE6;margin-top:2px;">${c.snNotes}</div>`:''}${ic?`<div style="font-size:11px;color:#CC0000;margin-top:3px;font-weight:500;">Remove ${c.name}? Cannot be undone.</div>`:''} ${ie?`<div class="edit-form"><div style="font-size:11px;font-weight:600;color:#007AFF;margin-bottom:9px;text-transform:uppercase;letter-spacing:0.5px;">Editing ${c.name}</div><div class="form-grid" style="gap:7px;margin-bottom:7px;"><div class="form-group"><label class="form-label">First name</label><input class="form-input" id="edit-first-${i}" type="text" value="${first}" style="font-size:13px;padding:7px 10px;"/></div><div class="form-group"><label class="form-label">Last name</label><input class="form-input" id="edit-last-${i}" type="text" value="${last}" style="font-size:13px;padding:7px 10px;"/></div><div class="form-group full"><label class="form-label">Date of birth</label><input class="form-input" id="edit-dob-${i}" type="date" value="${c.bday?c.bday.split('T')[0]:''}"
  style="font-size:13px;padding:7px 10px;"/></div><div class="form-group full"><label class="form-label">Language at home</label><input class="form-input" id="edit-lang-${i}" type="text" value="${c.language||''}" style="font-size:13px;padding:7px 10px;"/></div><div class="form-group"><label class="form-label">Parent 1 name</label><input class="form-input" id="edit-p1name-${i}" type="text" value="${c.p1name||''}" style="font-size:13px;padding:7px 10px;"/></div><div class="form-group"><label class="form-label">Parent 1 phone</label><input class="form-input" id="edit-p1phone-${i}" type="tel" value="${c.p1phone||''}" style="font-size:13px;padding:7px 10px;"/></div><div class="form-group"><label class="form-label">Parent 2 name</label><input class="form-input" id="edit-p2name-${i}" type="text" value="${c.p2name||''}" style="font-size:13px;padding:7px 10px;"/></div><div class="form-group"><label class="form-label">Parent 2 phone</label><input class="form-input" id="edit-p2phone-${i}" type="tel" value="${c.p2phone||''}" style="font-size:13px;padding:7px 10px;"/></div><div class="form-group full"><label class="form-label">Medical notes</label><textarea class="form-input" id="edit-medical-${i}" rows="2" style="width:100%;font-size:13px;padding:7px 10px;">${c.medical||''}</textarea></div></div><div style="background:white;border:0.5px solid #5E5CE6;border-radius:8px;padding:9px;margin-bottom:7px;"><div style="display:flex;align-items:center;gap:7px;"><input type="checkbox" id="edit-sn-${i}" ${c.sn?'checked':''} onchange="toggleEditSn(${i})" style="width:16px;height:16px;accent-color:#5E5CE6;"/><label for="edit-sn-${i}" style="font-size:12px;">Special needs — one-to-one support</label></div><div id="edit-sn-area-${i}" style="display:${c.sn?'block':'none'};margin-top:6px;"><textarea class="form-input" id="edit-sn-notes-${i}" rows="2" style="width:100%;font-size:13px;padding:7px 10px;border-color:#5E5CE6;">${c.snNotes||''}</textarea></div></div><div style="background:white;border:0.5px solid #34C759;border-radius:8px;padding:9px;margin-bottom:7px;"><div style="display:flex;align-items:center;gap:7px;"><input type="checkbox" id="edit-member-${i}" ${c.member?'checked':''} style="width:16px;height:16px;accent-color:#34C759;"/><label for="edit-member-${i}" style="font-size:12px;">At least one parent/guardian is a member of Grace Fellowship Church</label></div></div><div style="display:flex;gap:7px;"><button class="btn primary" style="flex:1;padding:8px;" onclick="saveEdit(${i})">Save changes</button><button class="btn" style="padding:8px;" onclick="cancelEdit()">Cancel</button></div></div>
 :''} ${!ie&&c.medical&&!ic&&!c.editingRegMed?`<div class="reg-medical-display">${c.medical}</div>`:''} ${c.editingRegMed?`<div class="reg-edit-form"><div style="font-size:11px;font-weight:600;color:#CC0000;margin-bottom:5px;">Medical notes</div><textarea class="medical-textarea" rows="2" oninput="updateRegDraft(${i},this.value)" style="width:100%;border-color:#FF3B30;">${c.draftMedical||''}</textarea><div class="save-row"><button class="btn small red" onclick="saveRegMed(${i})">Save</button><button class="btn small" onclick="cancelRegMedEdit(${i})">Cancel</button><span class="saved-ok" id="reg-saved-${i}">Saved.</span></div></div>`:''}</div>${!ie?`<div style="display:flex;gap:5px;flex-shrink:0;margin-top:1px;flex-direction:column;align-items:flex-end;">${ic?`<button class="btn small red" onclick="confirmRemove(${i})">Yes, remove</button><button class="btn small" onclick="cancelRemove()">Cancel</button>`:`<button class="btn small blue" onclick="startEdit(${i})">Edit</button><button class="btn small red" onclick="promptRemove(${i})">Remove</button>${!c.editingRegMed?`<button class="btn small" style="border-color:#FF3B30;color:#CC0000;" onclick="startRegMedEdit(${i})">${c.medical?'Edit note':'Add note'}</button>`:''}`}</div>`:''}</div>`;}).join('');}
 
