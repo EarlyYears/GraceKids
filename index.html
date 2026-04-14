@@ -389,7 +389,7 @@ async function syncSnapshots(){
   }catch(e){console.error(e);}
 }
 
-function checkSessionReset(){const key=`grace-reset-${now.toISOString().split('T')[0]}-${session}`;if(localStorage.getItem(key))return;children.forEach(c=>{c.checkedIn=false;c.cl=mkCL();c.placementCls=null;});localStorage.setItem(key,'done');syncChild();}
+function checkSessionReset(){}
 
 setInterval(()=>{const h=now.getHours(),m=now.getMinutes();if((h===13&&m===30)||(h===21&&m===0))saveSnapshot();},60000);
 
