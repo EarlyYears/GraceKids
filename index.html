@@ -390,6 +390,8 @@ async function syncSnapshots(){
 }
 
 function checkSessionReset(){}
+async function startNewSession(){if(!confirm('This will check out all children and clear the session. Are you sure?'))return;children.forEach(c=>{c.checkedIn=false;c.cl=mkCL();c.placementCls=null;});await syncChild();renderList();renderDashboard();alert('New session started.');}
+window.startNewSession=startNewSession;
 
 setInterval(()=>{const h=now.getHours(),m=now.getMinutes();if((h===13&&m===30)||(h===21&&m===0))saveSnapshot();},60000);
 
