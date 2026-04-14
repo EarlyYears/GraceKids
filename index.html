@@ -338,7 +338,7 @@ function toggleSnNotes(){document.getElementById('sn-notes-area').style.display=
 function setSyncStatus(state,msg){const dot=document.getElementById('sync-dot');dot.className='sync-dot'+(state==='ok'?'':state==='syncing'?' syncing':' error');document.getElementById('sync-status').textContent=msg;}
 
 // ── FIREBASE SYNC ──────────────────────────────────────────────────────────
-function childToFb(c){return{name:c.name,bday:c.bday||'',language:c.language||'',p1name:c.p1name||'',p1phone:c.p1phone||'',p2name:c.p2name||'',p2phone:c.p2phone||'',medical:c.medical||'',sn:c.sn||false,snNotes:c.snNotes||'',checkedIn:c.checkedIn||false,code:c.code,placementCls:c.placementCls||'',member:c.member||false};}
+function childToFb(c){return{name:c.name,bday:c.bday||'',language:c.language||'',p1name:c.p1name||'',p1phone:c.p1phone||'',p2name:c.p2name||'',p2phone:c.p2phone||'',medical:c.medical||'',sn:c.sn||false,snNotes:c.snNotes||'',checkedIn:c.checkedIn||false,code:c.code,placementCls:c.placementCls||'',member:c.member||false,gkClass:c.gkClass||''};}
 function fbToChild(k,v){return{name:v.name||'',bday:v.bday||null,language:v.language||'',p1name:v.p1name||'',p1phone:v.p1phone||'',p2name:v.p2name||'',p2phone:v.p2phone||'',medical:v.medical||'',sn:v.sn||false,snNotes:v.snNotes||'',checkedIn:v.checkedIn||false,code:v.code||genCode(),placementCls:v.placementCls||null,cls:assignClass(v.bday||null),age:getAge(v.bday||null),expanded:false,cl:mkCL(),editingMed:false,draftMedical:v.medical||'',editingRegMed:false,fbKey:k,member:v.member||false};}
 
 function loadAllData(){
