@@ -180,8 +180,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <div id="warning-area"></div>
   <div class="tab-bar">
     <button class="tab active" onclick="showTab('dashboard',this)">Dashboard</button>
-    <button class="tab" onclick="showTab('checkin',this)">Check in</button>
-<button class="tab" onclick="showTab('checkout',this)">Check out</button>
+    <button class="tab" onclick="showTab('checkin',this)">Check in / out</button>
     <button class="tab" onclick="showTab('registration',this)">Registration</button>
     <button class="tab" onclick="showTab('medical',this)">Medical notes</button>
     <button class="tab" onclick="showTab('incidents',this)">Incident log</button>
@@ -198,12 +197,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <p style="font-size:11px;color:#6E6E73;margin-bottom:9px;">Tap a child's name to expand. Check in shows a label preview before printing.</p>
     <div class="child-list" id="child-list"></div>
   </div>
-  <div id="tab-checkout" style="display:none;">
-  <div style="background:white;border:0.5px solid #D1D1D6;border-radius:12px;padding:12px;margin-bottom:1rem;"><div style="font-size:11px;font-weight:600;color:#6E6E73;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Check out by security code</div><div style="display:flex;gap:8px;"><input id="checkout-code" type="number" placeholder="Enter 4-digit code" style="flex:1;padding:9px 11px;font-size:15px;border:0.5px solid #D1D1D6;border-radius:8px;background:#F9F9FB;" onkeydown="if(event.key==='Enter')checkoutByCode()"/><button class="btn green" onclick="checkoutByCode()">Check out</button></div><div id="checkout-result" style="margin-top:8px;font-size:12px;color:#6E6E73;"></div></div>
-  <div style="font-size:11px;font-weight:600;color:#6E6E73;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Or search by name</div>
-  <input class="search-bar" type="search" placeholder="Search by name..." oninput="filterCheckout(this.value)" id="checkout-search"/>
-  <div class="child-list" id="checkout-list"></div>
-</div>
   <div id="tab-registration" style="display:none;">
     <div class="success-banner" id="success-banner"></div>
     <div class="form-card"><div class="section-title">Child information</div><div class="form-grid">
@@ -398,11 +391,7 @@ async function syncSnapshots(){
 
 function checkSessionReset(){}
 async function checkoutByCode(){const code=document.getElementById('checkout-code').value.trim();if(!code){return;}const matches=children.filter(c=>c.checkedIn&&c.code===code);const result=document.getElementById('checkout-result');if(!matches.length){result.style.color='#FF3B30';result.textContent='No checked-in children found with that code.';return;}matches.forEach(c=>{c.checkedIn=false;c.cl=mkCL();c.placementCls=null;});await syncChild();renderList();renderDashboard();document.getElementById('checkout-code').value='';result.style.color='#1A7F37';result.textContent=`Checked out: ${matches.map(c=>fullName(c.name)).join(', ')}`;}
-window.checkoutByCode=checkoutByCode;
-function filterCheckout(q){const search=q.toLowerCase();const filtered=children.filter(c=>c.checkedIn&&c.name.toLowerCase().includes(search)).sort((a,b)=>a.name.localeCompare(b.name));const seen=new Set();const families=[];filtered.forEach(c=>{const fk=getFamilyKey(c);if(!seen.has(fk)){seen.add(fk);families.push(getFamilyMembers(c).filter(m=>m.checkedIn));}});document.getElementById('checkout-list').innerHTML=families.map((members,fi)=>{return`<div style="background:white;border:0.5px solid #D1D1D6;border-radius:10px;padding:12px;margin-bottom:8px;"><div style="font-size:11px;color:#6E6E73;margin-bottom:8px;">Security code: <strong>${members[0]?.code||''}</strong></div>${members.map((c,ci)=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:0.5px solid #F0F0F0;"><input type="checkbox" id="co-cb-${fi}-${ci}" checked style="width:18px;height:18px;accent-color:#FF3B30;"/><div><div style="font-size:13px;font-weight:500;">${fullName(c.name)}</div><div style="font-size:11px;color:#6E6E73;">${c.cls}</div></div></div>`).join('')}<button class="btn red" style="width:100%;margin-top:10px;padding:8px;" onclick="checkoutFamily(${fi})">Check out selected</button></div>`;}).join('')||'<div class="empty-state">No checked-in children match your search.</div>';window._coFamilies=families;}
-window.filterCheckout=filterCheckout;
-async function checkoutFamily(fi){const members=window._coFamilies[fi];const selected=members.filter((_,ci)=>document.getElementById(`co-cb-${fi}-${ci}`)?.checked);if(!selected.length){alert('No children selected.');return;}selected.forEach(c=>{c.checkedIn=false;c.cl=mkCL();c.placementCls=null;});await syncChild();renderList();renderDashboard();filterCheckout(document.getElementById('checkout-search').value);setSyncStatus('ok',`Checked out: ${selected.map(c=>fullName(c.name)).join(', ')}`);}
-window.checkoutFamily=checkoutFamily;function checkPassword(){const pw=document.getElementById('login-password').value;if(pw==='GFCearlyyears20'){document.getElementById('login-screen').style.display='none';document.getElementById('main-app').style.display='block';loadAllData();}else{document.getElementById('login-error').style.display='block';document.getElementById('login-password').value='';}}
+window.checkoutByCode=checkoutByCode;function checkPassword(){const pw=document.getElementById('login-password').value;if(pw==='GFCearlyyears20'){document.getElementById('login-screen').style.display='none';document.getElementById('main-app').style.display='block';loadAllData();}else{document.getElementById('login-error').style.display='block';document.getElementById('login-password').value='';}}
 window.checkPassword=checkPassword;async function startNewSession(){if(!confirm('This will check out all children and clear the session. Are you sure?'))return;const familyCodeMap={};children.forEach(c=>{const fk=getFamilyKey(c);if(!familyCodeMap[fk])familyCodeMap[fk]=genCode();c.checkedIn=false;c.cl=mkCL();c.placementCls=null;c.code=familyCodeMap[fk];});Object.keys(teachers).forEach(k=>{teachers[k]=0;});await set(ref(db,'data/teachers'),{});await syncChild();renderList();renderDashboard();alert('New session started.');}
 
 window.startNewSession=startNewSession;
@@ -411,7 +400,7 @@ setInterval(()=>{const h=now.getHours(),m=now.getMinutes();if((h===13&&m===30)||
 
 async function saveSnapshot(){const ds=now.toISOString().split('T')[0];const ci=children.filter(c=>c.checkedIn);if(!ci.length){alert('No children checked in.');return;}const cc={};sessionClasses.forEach(cls=>{cc[cls]=children.filter(c=>c.cls===cls&&c.checkedIn).length;});const sl=session==='morning'?'Morning':'Evening';if(!sessionSnapshots.find(s=>s.date===ds&&s.session===sl)){sessionSnapshots.push({date:ds,session:sl,total:ci.length,classes:cc});ci.forEach(c=>checkInHistory.push({date:ds,session:sl,name:c.name}));await syncSnapshots();}alert(`Snapshot saved: ${ci.length} children.`);}
 
-function showTab(tab,btn){['dashboard','checkin','checkout','registration','medical','incidents','desknotes','registry','reports'].forEach(t=>{document.getElementById('tab-'+t).style.display=t===tab?'block':'none';});
+function showTab(tab,btn){['dashboard','checkin','registration','medical','incidents','desknotes','registry','reports'].forEach(t=>{document.getElementById('tab-'+t).style.display=t===tab?'block':'none';});document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');if(tab==='medical')renderMedical();if(tab==='incidents'){renderIncidents();populateChildSelect();}if(tab==='dashboard')renderDashboard();if(tab==='desknotes')renderDeskNotes();if(tab==='registry'){editingIdx=null;confirmingRemoval=null;renderRegistry('');}if(tab==='reports')generateReports();}
 
 window.showTab=showTab;
 
