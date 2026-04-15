@@ -505,7 +505,8 @@ onValue(ref(db,'data/teachers'),snap=>{const t=snap.val()||{};Object.keys(t).for
   }catch(e){setSyncStatus('error','Import failed');console.error(e);}
 }
 window.importFromSheet=importFromSheet;
-loadAllData();
+document.getElementById('login-screen').style.display='flex';document.getElementById('main-app').style.display='none';
+
 </script>
 </body>
 </html>
