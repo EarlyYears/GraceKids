@@ -331,7 +331,7 @@ function assignClass(b,gkClass){if(!b)return'Unknown';const m=getAgeMonths(b);if
 function getAge(b){if(!b)return'';const m=getAgeMonths(b);if(m===null)return'';if(m<24)return m+'mo';return Math.floor(m/12)+'y '+(m%12)+'mo';}
 function genCode(){return Math.floor(1000+Math.random()*9000).toString();}
 function getFamilyKey(c){const names=[c.p1name,c.p2name].filter(Boolean).sort();return names.length?names.join('|'):'solo_'+c.name;}
-function getFamilyMembers(c){const fk=getFamilyKey(c);return children.filter(x=>getFamilyKey(x)===fk).sort((a,b)=>a.name.localeCompare(b.name));}
+function getFamilyMembers(c){const cNames=new Set([c.p1name,c.p2name].filter(Boolean));if(cNames.size===0)return[c];return children.filter(x=>{const xNames=[x.p1name,x.p2name].filter(Boolean);return xNames.some(n=>cNames.has(n));}).sort((a,b)=>a.name.localeCompare(b.name));}
 function mkCL(){return{ill:false,noSnack:false,bag:false,cup:false,noChange:false,noSit:false};}
 function fullName(n){const p=n.split(', ');if(p.length<2)return n;return p.slice(1).join(' ')+' '+p[0];}
 function toggleSnNotes(){document.getElementById('sn-notes-area').style.display=document.getElementById('reg-sn').checked?'block':'none';}
