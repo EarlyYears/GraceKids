@@ -386,7 +386,7 @@ async function syncDeskNotes(){
 }
 async function syncSnapshots(){
   try{
-    await set(ref(db,'data/snapshots'),Object.fromEntries(sessionSnapshots.map((s,i)=>[i.toString(),s])));
+await set(ref(db,'data/snapshots'),Object.fromEntries(sessionSnapshots.map((s,i)=>[i.toString(),{...s,classes:Object.fromEntries(Object.entries(s.classes).map(([k,v])=>[k.replace(/\//g,'_'),v]))}])));
     await set(ref(db,'data/checkins'),Object.fromEntries(checkInHistory.map((h,i)=>[i.toString(),h])));
   }catch(e){console.error(e);}
 }
