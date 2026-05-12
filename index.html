@@ -246,7 +246,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   </div>
   <div id="tab-registry" style="display:none;">
     <div class="totals-bar"><span>Total registered: <strong id="registry-total">0</strong></span></div>
-    <input class="search-bar" type="search" placeholder="Search registry..." oninput="renderRegistry(this.value)" id="registry-search"/>
+    <input class="search-bar" type="text" placeholder="Search registry..." oninput="renderRegistry(this.value)" onkeyup="renderRegistry(this.value)" id="registry-search"/>
     <div class="filter-row" id="registry-filter-row"></div>
     <div id="registry-list"></div>
   </div>
