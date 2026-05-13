@@ -317,8 +317,7 @@ let confirmingRemoval=null,editingIdx=null,pendingCheckinIdx=null,pendingFamily=
 let lineChartInst=null,barChartInst=null,syncTimeout=null;
 let fbLoaded=false;
 let familyCodes={};
-function getFamilyCode(c){const fk=getFamilyKey(c).replace(/[.#$[\]|]/g,'_');const sessionKey=now.toISOString().split('T')[0]+'_'+session;const storeKey=fk+'_'+sessionKey;if(!familyCodes[storeKey]){familyCodes[storeKey]=genCode();set(ref(db,'data/familyCodes/'+storeKey),familyCodes[storeKey]);}return familyCodes[storeKey];}
-
+function getFamilyCode(c){const fk=getFamilyKey(c).replace(/[.#$[\]|]/g,'_');const sessionKey=now.toISOString().split('T')[0]+'_'+session;const storeKey=fk+'_'+sessionKey;if(!familyCodes[storeKey]){familyCodes[storeKey]=genCode();setTimeout(()=>set(ref(db,'data/familyCodes/'+storeKey),familyCodes[storeKey]),2000);}return familyCodes[storeKey];}
 document.getElementById('today-date').textContent=now.toLocaleDateString('en-CA',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
 document.getElementById('desk-date').value=now.toISOString().split('T')[0];
 const t30=new Date(now);t30.setDate(t30.getDate()-30);
