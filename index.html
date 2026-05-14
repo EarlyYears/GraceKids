@@ -344,6 +344,7 @@ function fbToChild(k,v){return{name:v.name||'',bday:v.bday||null,language:v.lang
 function loadAllData(){
   setSyncStatus('syncing','Connecting...');
   onValue(ref(db,'data'),snap=>{
+    if(sessionResetting)return;
     const d=snap.val()||{};
     const ch=d.children||{};
     children=Object.entries(ch).map(([k,v])=>fbToChild(k,v)).sort((a,b)=>a.name.localeCompare(b.name));
