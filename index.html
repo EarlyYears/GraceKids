@@ -248,17 +248,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="filter-row" id="registry-filter-row"></div>
     <div id="registry-list"></div>
   </div>
-  <div id="tab-reports" style="display:none;">
-    <div class="form-card"><div class="section-title">Filter</div><div class="report-controls">
-      <div class="form-group"><label class="form-label">From</label><input class="form-input" id="report-from" type="date"/></div>
-      <div class="form-group"><label class="form-label">To</label><input class="form-input" id="report-to" type="date"/></div>
-      <div class="form-group"><label class="form-label">Session</label><select class="form-input" id="report-session" onchange="generateReports()"><option value="all">All sessions</option><option value="Morning">Morning only</option><option value="Evening">Evening only</option></select></div>
-      <button class="btn primary" style="padding:8px 16px;align-self:flex-end;" onclick="generateReports()">Generate</button>
-    </div></div>
-    <div class="chart-container"><div class="chart-title" id="line-chart-title">Attendance trend</div><canvas id="line-chart" height="200"></canvas></div>
-    <div class="chart-container"><div class="chart-title" id="bar-chart-title">Class breakdown</div><canvas id="bar-chart" height="200"></canvas></div>
-    <div class="chart-container"><div class="chart-title">Individual child attendance — alphabetical</div><div id="child-attendance-table"></div></div>
-  </div>
+  <div id="tab-reports" style="display:none;"><div class="form-card"><div class="section-title">Filter</div><div class="report-controls"><div class="form-group"><label class="form-label">Period</label><select class="form-input" id="report-period" onchange="generateReports()"><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select></div><div class="form-group"><label class="form-label">Session</label><select class="form-input" id="report-session" onchange="generateReports()"><option value="all">All sessions</option><option value="Morning">Morning only</option><option value="Evening">Evening only</option></select></div><div class="form-group"><label class="form-label">Class</label><select class="form-input" id="report-class" onchange="generateReports()"><option value="all">All classes</option></select></div><button class="btn primary" style="padding:8px 16px;align-self:flex-end;" onclick="generateReports()">Generate</button></div></div><div class="chart-container"><div class="chart-title" id="program-chart-title">Program attendance</div><canvas id="program-chart" height="200"></canvas></div><div class="chart-container"><div class="chart-title" id="class-chart-title">Class breakdown</div><div id="class-breakdown-table" style="overflow-x:auto;"></div></div><div class="chart-container"><div class="chart-title">Individual child attendance</div><input type="text" id="child-search" placeholder="Search by name..." style="width:100%;padding:8px 11px;font-size:13px;border:0.5px solid #D1D1D6;border-radius:8px;margin-bottom:10px;" oninput="renderChildTable()"/><div id="child-attendance-table"></div></div></div>
 </div>
 <div class="modal-overlay" id="overlay" onclick="closeAllModals()"></div>
 <div class="popup" id="class-popup">
@@ -429,7 +419,7 @@ function famSetCheck(idx,field,val){if(pendingFamily&&pendingFamily[idx]){pendin
 window.famSetCheck=famSetCheck;
 function cancelCheckin(){if(pendingFamily){pendingFamily.forEach(m=>{m.pendingCheckin=false;const idx=children.findIndex(x=>x.name===m.name);if(idx>=0){children[idx].checkedIn=false;children[idx].cl=mkCL();children[idx].placementCls=null;}});scheduleSync();pendingFamily=null;pendingFamilyCode=null;}if(pendingCheckinIdx!==null){if(pendingCheckinIdx>=0){children[pendingCheckinIdx].checkedIn=false;renderList();scheduleSync();}pendingCheckinIdx=null;}
 document.getElementById('preview-modal').style.display='none';document.getElementById('overlay').style.display='none';const ma=document.getElementById('preview-modal').querySelector('.modal-actions');if(ma)ma.innerHTML=`<button class="btn blue" style="flex:1;" onclick="printNow()">Print</button><button class="btn" onclick="cancelCheckin()">Cancel</button>`;}
-function printNow(){if(pendingFamily){const selected=pendingFamily.filter((_,idx)=>document.getElementById('fam-cb-'+idx)?.checked);const checkedInSelected=[];selected.forEach((c,sidx)=>{const idx=children.findIndex(x=>x.name===c.name);if(idx>=0){const ccls=children[idx].cls;if(EARLY_YEARS.includes(ccls)&&!children[idx].sn){const ct=teachers[ccls]||0;const cmax=ct*RATIOS[ccls];const crc=children.filter(x=>!x.sn&&x.cls===ccls&&x.checkedIn).length;if(ct>0&&crc>=cmax){if(children[idx].member){alert(`${ccls} is at capacity. ${fullName(children[idx].name)} cannot be checked in.`);return;}else{const mKids=children.filter(x=>x.member&&x.cls===ccls&&x.checkedIn&&!x.sn);const lastM=mKids.length?fullName(mKids[mKids.length-1].name):null;const msg=lastM?`You will need to check out ${lastM} as ${ccls} is at capacity. Check in ${fullName(children[idx].name)} anyway?`:`${ccls} is at capacity. Check in ${fullName(children[idx].name)} anyway?`;if(!confirm(msg))return;}}}children[idx].checkedIn=true;children[idx].code=pendingFamilyCode;checkedInSelected.push(c);if(children[idx].sn){const famIdx=pendingFamily.indexOf(c);const pl=document.getElementById('fam-placement-'+famIdx);children[idx].placementCls=pl?pl.value||null:null;}}});renderList();scheduleSync();let html='';checkedInSelected.forEach(c=>{if(!c.cl)c.cl=mkCL();const i=children.findIndex(x=>x.name===c.name);if(i>=0){children[i].cl=c.cl;html+=buildPrintHTML(i,pendingFamilyCode,true);}else{const tempIdx=children.length;children.push(c);html+=buildPrintHTML(tempIdx,pendingFamilyCode,true);children.pop();}});
+function printNow(){if(pendingFamily){const selected=pendingFamily.filter((_,idx)=>document.getElementById('fam-cb-'+idx)?.checked);const checkedInSelected=[];selected.forEach((c,sidx)=>{const idx=children.findIndex(x=>x.name===c.name);if(idx>=0){const ccls=children[idx].cls;if(EARLY_YEARS.includes(ccls)&&!children[idx].sn){const ct=teachers[ccls]||0;const cmax=ct*RATIOS[ccls];const crc=children.filter(x=>!x.sn&&x.cls===ccls&&x.checkedIn).length;if(ct>0&&crc>=cmax){if(children[idx].member){alert(`${ccls} is at capacity. ${fullName(children[idx].name)} cannot be checked in.`);return;}else{const mKids=children.filter(x=>x.member&&x.cls===ccls&&x.checkedIn&&!x.sn);const lastM=mKids.length?fullName(mKids[mKids.length-1].name):null;const msg=lastM?`You will need to check out ${lastM} as ${ccls} is at capacity. Check in ${fullName(children[idx].name)} anyway?`:`${ccls} is at capacity. Check in ${fullName(children[idx].name)} anyway?`;if(!confirm(msg))return;}}}children[idx].checkedIn=true;children[idx].code=pendingFamilyCode;const ciEntry={id:Date.now()+"_"+idx,date:now.toISOString().split("T")[0],session:session==="morning"?"Morning":"Evening",name:children[idx].name,cls:children[idx].sn&&children[idx].placementCls?children[idx].placementCls:children[idx].cls,member:children[idx].member||false,sn:children[idx].sn||false};checkInHistory.push(ciEntry);set(ref(db,"data/checkins/"+ciEntry.id),ciEntry);checkedInSelected.push(c);if(children[idx].sn){const famIdx=pendingFamily.indexOf(c);const pl=document.getElementById('fam-placement-'+famIdx);children[idx].placementCls=pl?pl.value||null:null;}}});renderList();scheduleSync();let html='';checkedInSelected.forEach(c=>{if(!c.cl)c.cl=mkCL();const i=children.findIndex(x=>x.name===c.name);if(i>=0){children[i].cl=c.cl;html+=buildPrintHTML(i,pendingFamilyCode,true);}else{const tempIdx=children.length;children.push(c);html+=buildPrintHTML(tempIdx,pendingFamilyCode,true);children.pop();}});
 
 
 html+=`<div class="pl-sec"><div class="pl-sl">Family security tag</div><div class="pl-sc">${pendingFamilyCode}</div></div>`;document.getElementById('print-area').innerHTML=html;pendingFamily=null;pendingFamilyCode=null;document.getElementById('preview-modal').style.display='none';document.getElementById('overlay').style.display='none';setTimeout(()=>{try{window.print();}catch(e){console.error('Print error:',e);}},300);return;}
@@ -505,7 +495,69 @@ ${c.language?' · '+c.language:''}${c.medical?' · Medical':''}${c.sn?' · Speci
 <label for="edit-member-${i}" style="font-size:12px;">At least one parent/guardian is a member of Grace Fellowship Church</label></div></div><div style="display:flex;gap:7px;"><button class="btn primary" style="flex:1;padding:8px;" onclick="saveEdit(${i})">Save changes</button><button class="btn" style="padding:8px;" onclick="cancelEdit()">Cancel</button></div></div>`:''} ${!ie&&c.medical&&!ic&&!c.editingRegMed?`<div class="reg-medical-display">${c.medical}</div>`:''} ${c.editingRegMed?`<div class="reg-edit-form"><div style="font-size:15px;font-weight:600;color:#000000;;margin-bottom:5px;">Medical notes</div><textarea class="medical-textarea" rows="2" oninput="updateRegDraft(${i},this.value)" style="width:100%;border-color:#FF3B30;">${c.draftMedical||''}</textarea><div class="save-row"><button class="btn small red" onclick="saveRegMed(${i})">Save</button><button class="btn small" onclick="cancelRegMedEdit(${i})">Cancel</button><span class="saved-ok" id="reg-saved-${i}">Saved.</span></div></div>`:''}</div>${!ie?`<div style="display:flex;gap:5px;flex-shrink:0;margin-top:1px;flex-direction:column;align-items:flex-end;">${ic?`<button class="btn small red" onclick="confirmRemove(${i})">Yes, remove</button><button class="btn small" onclick="cancelRemove()">Cancel</button>`:`<button class="btn small blue" onclick="startEdit(${i})">Edit</button>
 <button class="btn small red" onclick="promptRemove(${i})">Remove</button>${!c.editingRegMed?`<button class="btn small" style="border-color:#FF3B30;color:#000000;" onclick="startRegMedEdit(${i})">${c.medical?'Edit note':'Add note'}</button>`:''}`}</div>`:''}</div>`;}).join('');}
 
-function generateReports(){const from=document.getElementById('report-from').value;const to=document.getElementById('report-to').value;const sf=document.getElementById('report-session').value;if(!from||!to)return;const filtered=sessionSnapshots.filter(s=>s.date>=from&&s.date<=to&&(sf==='all'||s.session===sf)).sort((a,b)=>a.date.localeCompare(b.date)||a.session.localeCompare(b.session));const sl=sf==='all'?'All sessions':sf+' only';document.getElementById('line-chart-title').textContent=`Attendance trend — ${sl}`;if(lineChartInst)lineChartInst.destroy();lineChartInst=new Chart(document.getElementById('line-chart'),{type:'line',data:{labels:filtered.map(s=>s.date.slice(5)+' '+s.session.slice(0,1)),datasets:[{label:'Total',data:filtered.map(s=>s.total),borderColor:'#007AFF',backgroundColor:'rgba(0,122,255,0.1)',tension:0.3,fill:true,pointBackgroundColor:'#007AFF',pointRadius:4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});document.getElementById('bar-chart-title').textContent=`Class breakdown — ${sl}`;const allCls=[...new Set(filtered.flatMap(s=>Object.keys(s.classes)))];const colors=['#007AFF','#34C759','#FF9500','#FF3B30','#5E5CE6','#FF2D55','#30D158'];if(barChartInst)barChartInst.destroy();barChartInst=new Chart(document.getElementById('bar-chart'),{type:'bar',data:{labels:allCls,datasets:[{label:'Total',data:allCls.map(cls=>filtered.reduce((s,snap)=>s+(snap.classes[cls]||0),0)),backgroundColor:allCls.map((_,i)=>colors[i%colors.length]),borderRadius:4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});const hf=checkInHistory.filter(h=>h.date>=from&&h.date<=to&&(sf==='all'||h.session===sf));const counts={};hf.forEach(h=>{if(!counts[h.name])counts[h.name]={morning:0,evening:0};if(h.session==='Morning')counts[h.name].morning++;else counts[h.name].evening++;});const sorted=Object.entries(counts).sort((a,b)=>a[0].localeCompare(b[0]));const table=document.getElementById('child-attendance-table');if(!sorted.length){table.innerHTML='<div class="empty-state">No attendance data for this period.</div>';return;}table.innerHTML=`<table class="attendance-table"><thead><tr><th>Name</th>${sf==='all'?'<th>Morning</th><th>Evening</th>':''}<th>Total</th></tr></thead><tbody>${sorted.map(([name,c])=>`<tr><td>${name}</td>${sf==='all'?`<td>${c.morning||'—'}</td><td>${c.evening||'—'}</td>`:''}<td style="font-weight:600;">${c.morning+c.evening}</td></tr>`).join('')}</tbody></table>`;}
+function getWeekKey(d){const dt=new Date(d);const day=dt.getDay();const diff=dt.getDate()-day+(day===0?-6:1);const mon=new Date(dt.setDate(diff));return mon.toISOString().split("T")[0];}
+function getMonthKey(d){return d.substring(0,7);}
+function getYearKey(d){return d.substring(0,4);}
+function getPeriodKey(d,period){if(period==="weekly")return getWeekKey(d);if(period==="monthly")return getMonthKey(d);return getYearKey(d);}
+function getPeriodLabel(k,period){if(period==="yearly")return k;if(period==="monthly"){const p=k.split("-");return new Date(p[0],p[1]-1).toLocaleDateString("en-CA",{month:"short",year:"numeric"});}const d=new Date(k);return"Wk "+d.toLocaleDateString("en-CA",{month:"short",day:"numeric"});}
+function filterHistory(){const sf=document.getElementById("report-session").value;const cf=document.getElementById("report-class").value;return checkInHistory.filter(h=>(sf==="all"||h.session===sf)&&(cf==="all"||h.cls===cf));}
+function renderProgramChart(){
+  const period=document.getElementById("report-period").value;
+  const sf=document.getElementById("report-session").value;
+  const history=filterHistory();
+  const buckets={};
+  history.forEach(h=>{const k=getPeriodKey(h.date,period);if(!buckets[k])buckets[k]={Morning:0,Evening:0};buckets[k][h.session]=(buckets[k][h.session]||0)+1;});
+  const keys=Object.keys(buckets).sort();
+  const labels=keys.map(k=>getPeriodLabel(k,period));
+  document.getElementById("program-chart-title").textContent="Program attendance — "+period;
+  if(window._programChart)window._programChart.destroy();
+  const datasets=[];
+  if(sf==="all"||sf==="Morning")datasets.push({label:"Morning",data:keys.map(k=>buckets[k].Morning||0),backgroundColor:"#34C759",borderRadius:4});
+  if(sf==="all"||sf==="Evening")datasets.push({label:"Evening",data:keys.map(k=>buckets[k].Evening||0),backgroundColor:"#007AFF",borderRadius:4});
+  window._programChart=new Chart(document.getElementById("program-chart"),{type:"bar",data:{labels,datasets},options:{responsive:true,plugins:{legend:{display:sf==="all"}},scales:{x:{stacked:false},y:{beginAtZero:true}}}});
+}
+function renderClassChart(){
+  const period=document.getElementById("report-period").value;
+  const cf=document.getElementById("report-class").value;
+  const history=filterHistory();
+  const classes=cf==="all"?sessionClasses:[cf];
+  const periodKeys=[...new Set(history.map(h=>getPeriodKey(h.date,period)))].sort();
+  const data={};
+  classes.forEach(cls=>{data[cls]={};periodKeys.forEach(k=>{data[cls][k]=0;});});
+  history.forEach(h=>{const k=getPeriodKey(h.date,period);if(data[h.cls]&&data[h.cls][k]!==undefined)data[h.cls][k]++;});
+  const periodTotals={};
+  periodKeys.forEach(k=>{periodTotals[k]=classes.reduce((s,cls)=>s+(data[cls]?data[cls][k]||0:0),0);});
+  document.getElementById("class-chart-title").textContent="Class breakdown — "+period;
+  if(!periodKeys.length){document.getElementById("class-breakdown-table").innerHTML='<div class="empty-state">No data yet.</div>';return;}
+  const headers=periodKeys.map(k=>getPeriodLabel(k,period));
+  let html='<table class="attendance-table" style="min-width:100%;"><thead><tr><th>Class</th>'+headers.map(h=>'<th>'+h+'</th>').join("")+'<th>Total</th></tr></thead><tbody>';
+  classes.forEach(cls=>{
+    const rowTotal=periodKeys.reduce((s,k)=>s+(data[cls]?data[cls][k]||0:0),0);
+    if(rowTotal===0)return;
+    html+='<tr><td style="font-weight:500;">'+cls+'</td>'+periodKeys.map(k=>'<td>'+((data[cls]&&data[cls][k])||"—")+'</td>').join("")+'<td style="font-weight:600;">'+rowTotal+'</td></tr>';
+  });
+  html+='<tr style="border-top:2px solid #D1D1D6;font-weight:600;background:#F5F5F7;"><td>Total</td>'+periodKeys.map(k=>'<td>'+periodTotals[k]+'</td>').join("")+'<td>'+periodKeys.reduce((s,k)=>s+periodTotals[k],0)+'</td></tr>';
+  html+='</tbody></table>';
+  document.getElementById("class-breakdown-table").innerHTML=html;
+}
+function renderChildTable(){
+  const search=(document.getElementById("child-search")?.value||"").toLowerCase();
+  const sf=document.getElementById("report-session").value;
+  const history=filterHistory();
+  const counts={};
+  history.forEach(h=>{if(!counts[h.name])counts[h.name]={morning:0,evening:0,cls:h.cls,member:h.member};if(h.session==="Morning")counts[h.name].morning++;else counts[h.name].evening++;});
+  let rows=Object.entries(counts).sort((a,b)=>a[0].localeCompare(b[0]));
+  if(search)rows=rows.filter(([name])=>name.toLowerCase().includes(search)||fullName(name).toLowerCase().includes(search));
+  const table=document.getElementById("child-attendance-table");
+  if(!rows.length){table.innerHTML='<div class="empty-state">No attendance data found.</div>';return;}
+  table.innerHTML='<table class="attendance-table"><thead><tr><th>Name</th><th>Class</th><th>Member</th>'+(sf==="all"?"<th>Morning</th><th>Evening</th>":"")+'<th>Total</th></tr></thead><tbody>'+rows.map(([name,d])=>'<tr><td>'+fullName(name)+'</td><td>'+( d.cls||"—")+'</td><td>'+( d.member?"✓":"")+'</td>'+(sf==="all"?"<td>"+(d.morning||"—")+"</td><td>"+(d.evening||"—")+"</td>":"")+'<td style="font-weight:600;">'+( d.morning+d.evening)+'</td></tr>').join("")+'</tbody></table>';
+}
+window.renderChildTable=renderChildTable;
+function generateReports(){
+  const clsSel=document.getElementById("report-class");
+  if(clsSel.options.length===1){sessionClasses.forEach(cls=>{const o=document.createElement("option");o.value=cls;o.textContent=cls;clsSel.appendChild(o);});}
+  renderProgramChart();renderClassChart();renderChildTable();
+}
 window.generateReports=generateReports;
 onValue(ref(db,'data/teachers'),snap=>{const t=snap.val()||{};Object.keys(t).forEach(k=>{if(document.activeElement.className!=='teacher-input')teachers[k]=t[k];});renderDashboard();});
 
