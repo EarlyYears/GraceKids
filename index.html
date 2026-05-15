@@ -172,7 +172,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <div class="top-bar">
     <div><div class="app-title">Early Years / Grace Kids</div><div class="app-date" id="today-date"></div></div>
     <div style="display:flex;gap:8px;align-items:center;">
-<button class="btn small" onclick="startNewSession()" style="background:#FF3B30;color:white;border-color:#FF3B30;">Start new session</button>
+<button class="btn small" onclick="saveSnapshot()">Save snapshot</button><button class="btn small" onclick="startNewSession()" style="background:#FF3B30;color:white;border-color:#FF3B30;">Start new session</button>
       <div id="session-badge" class="session-badge"></div>
     </div>
   </div>
@@ -248,7 +248,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="filter-row" id="registry-filter-row"></div>
     <div id="registry-list"></div>
   </div>
-  <div id="tab-reports" style="display:none;"><div class="form-card"><div class="section-title">Filter</div><div class="report-controls"><div class="form-group"><label class="form-label">Period</label><select class="form-input" id="report-period" onchange="generateReports()"><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select></div><div class="form-group"><label class="form-label">Session</label><select class="form-input" id="report-session" onchange="generateReports()"><option value="all">All sessions</option><option value="Morning">Morning only</option><option value="Evening">Evening only</option></select></div><div class="form-group"><label class="form-label">Class</label><select class="form-input" id="report-class" onchange="generateReports()"><option value="all">All classes</option></select></div><button class="btn primary" style="padding:8px 16px;align-self:flex-end;" onclick="generateReports()">Generate</button></div></div><div class="chart-container"><div class="chart-title" id="program-chart-title">Program attendance</div><canvas id="program-chart" height="200"></canvas></div><div class="chart-container"><div class="chart-title" id="class-chart-title">Class breakdown</div><div id="class-breakdown-table" style="overflow-x:auto;"></div></div><div class="chart-container"><div class="chart-title">Individual child attendance</div><input type="text" id="child-search" placeholder="Search by name..." style="width:100%;padding:8px 11px;font-size:13px;border:0.5px solid #D1D1D6;border-radius:8px;margin-bottom:10px;" oninput="renderChildTable()"/><div id="child-attendance-table"></div></div></div>
+  <div id="tab-reports" style="display:none;">
+    <div class="form-card"><div class="section-title">Filter</div><div class="report-controls">
+      <div class="form-group"><label class="form-label">From</label><input class="form-input" id="report-from" type="date"/></div>
+      <div class="form-group"><label class="form-label">To</label><input class="form-input" id="report-to" type="date"/></div>
+      <div class="form-group"><label class="form-label">Session</label><select class="form-input" id="report-session" onchange="generateReports()"><option value="all">All sessions</option><option value="Morning">Morning only</option><option value="Evening">Evening only</option></select></div>
+      <button class="btn primary" style="padding:8px 16px;align-self:flex-end;" onclick="generateReports()">Generate</button>
+    </div></div>
+    <div class="chart-container"><div class="chart-title" id="line-chart-title">Attendance trend</div><canvas id="line-chart" height="200"></canvas></div>
+    <div class="chart-container"><div class="chart-title" id="bar-chart-title">Class breakdown</div><canvas id="bar-chart" height="200"></canvas></div>
+    <div class="chart-container"><div class="chart-title">Individual child attendance — alphabetical</div><div id="child-attendance-table"></div></div>
+  </div>
 </div>
 <div class="modal-overlay" id="overlay" onclick="closeAllModals()"></div>
 <div class="popup" id="class-popup">
@@ -300,7 +310,7 @@ const MORNING_PLACEMENT=['Infant','Walkers','Preschool','Kindergarten'];
 const EVENING_PLACEMENT=['Infant/Walkers','Preschool','Kindergarten'];
 const sessionClasses=EV?EVENING_CLASSES:MORNING_CLASSES;
 const placementOptions=EV?EVENING_PLACEMENT:MORNING_PLACEMENT;
-let children=[],incidents=[],deskNotes=[],checkInHistory=[];
+let children=[],incidents=[],deskNotes=[],sessionSnapshots=[],checkInHistory=[];
 let currentFilter='all',currentSearch='',registryFilter='all';
 let confirmingRemoval=null,editingIdx=null,pendingCheckinIdx=null,pendingFamily=null,pendingFamilyCode=null;
 let lineChartInst=null,barChartInst=null,syncTimeout=null;
@@ -309,7 +319,9 @@ let familyCodes={};
 function getFamilyCode(c){const fk=getFamilyKey(c).replace(/[.#$[\]|]/g,'_');const sessionKey=now.toISOString().split('T')[0]+'_'+session;const storeKey=fk+'_'+sessionKey;if(!familyCodes[storeKey]){familyCodes[storeKey]=genCode();setTimeout(()=>set(ref(db,'data/familyCodes/'+storeKey),familyCodes[storeKey]),2000);}return familyCodes[storeKey];}
 document.getElementById('today-date').textContent=now.toLocaleDateString('en-CA',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
 document.getElementById('desk-date').value=now.toISOString().split('T')[0];
-
+const t30=new Date(now);t30.setDate(t30.getDate()-30);
+document.getElementById('report-from').value=t30.toISOString().split('T')[0];
+document.getElementById('report-to').value=now.toISOString().split('T')[0];
 const sb=document.getElementById('session-badge');
 sb.textContent=session==='morning'?'Morning session':'Evening session';
 sb.className='session-badge '+(session==='morning'?'session-morning':'session-evening');
@@ -320,14 +332,14 @@ function getAge(b){if(!b)return'';const m=getAgeMonths(b);if(m===null)return'';i
 function genCode(){return Math.floor(1000+Math.random()*9000).toString();}
 function getFamilyKey(c){const names=[c.p1name,c.p2name].filter(Boolean).sort();return names.length?names.join('|'):'solo_'+c.name;}
 function getFamilyMembers(c){const cNames=new Set([c.p1name,c.p2name].filter(Boolean));if(cNames.size===0)return[c];return children.filter(x=>{if(!EV&&['GK1','GK2','GK3'].includes(x.cls)&&!x.sn)return false;const xNames=[x.p1name,x.p2name].filter(Boolean);return xNames.some(n=>cNames.has(n));}).sort((a,b)=>a.name.localeCompare(b.name));}
-function mkCL(){return{ill:false,noSnack:false,bag:false,cup:false,noChange:false,noSit:false};}function isInactive(child){if(child.manualInactive)return true;const hist=checkInHistory.filter(h=>h.name===child.name);if(hist.length===0)return false;const last=hist.sort((a,b)=>b.date.localeCompare(a.date))[0];return Math.floor((now-new Date(last.date))/(1000*60*60*24))>90;}
+function mkCL(){return{ill:false,noSnack:false,bag:false,cup:false,noChange:false,noSit:false};}
 function fullName(n){const p=n.split(', ');if(p.length<2)return n;return p.slice(1).join(' ')+' '+p[0];}
 function toggleSnNotes(){document.getElementById('sn-notes-area').style.display=document.getElementById('reg-sn').checked?'block':'none';}
 function setSyncStatus(state,msg){const dot=document.getElementById('sync-dot');dot.className='sync-dot'+(state==='ok'?'':state==='syncing'?' syncing':' error');document.getElementById('sync-status').textContent=msg;}
 
 // ── FIREBASE SYNC ──────────────────────────────────────────────────────────
-function childToFb(c){return{name:c.name,bday:c.bday||'',language:c.language||'',p1name:c.p1name||'',p1phone:c.p1phone||'',p2name:c.p2name||'',p2phone:c.p2phone||'',medical:c.medical||'',sn:c.sn||false,snNotes:c.snNotes||'',checkedIn:c.checkedIn||false,code:c.code,placementCls:c.placementCls||'',member:c.member||false,gkClass:c.gkClass||'',manualInactive:c.manualInactive||false};}
-function fbToChild(k,v){return{name:v.name||'',bday:v.bday||null,language:v.language||'',p1name:v.p1name||'',p1phone:v.p1phone||'',p2name:v.p2name||'',p2phone:v.p2phone||'',medical:v.medical||'',sn:v.sn||false,snNotes:v.snNotes||'',checkedIn:v.checkedIn||false,code:v.code||genCode(),placementCls:v.placementCls||null,cls:assignClass(v.bday||null,v.gkClass||''),age:getAge(v.bday||null),expanded:false,cl:mkCL(),editingMed:false,draftMedical:v.medical||'',editingRegMed:false,fbKey:k,member:v.member||false,gkClass:v.gkClass||'',manualInactive:v.manualInactive||false};}
+function childToFb(c){return{name:c.name,bday:c.bday||'',language:c.language||'',p1name:c.p1name||'',p1phone:c.p1phone||'',p2name:c.p2name||'',p2phone:c.p2phone||'',medical:c.medical||'',sn:c.sn||false,snNotes:c.snNotes||'',checkedIn:c.checkedIn||false,code:c.code,placementCls:c.placementCls||'',member:c.member||false,gkClass:c.gkClass||''};}
+function fbToChild(k,v){return{name:v.name||'',bday:v.bday||null,language:v.language||'',p1name:v.p1name||'',p1phone:v.p1phone||'',p2name:v.p2name||'',p2phone:v.p2phone||'',medical:v.medical||'',sn:v.sn||false,snNotes:v.snNotes||'',checkedIn:v.checkedIn||false,code:v.code||genCode(),placementCls:v.placementCls||null,cls:assignClass(v.bday||null,v.gkClass||''),age:getAge(v.bday||null),expanded:false,cl:mkCL(),editingMed:false,draftMedical:v.medical||'',editingRegMed:false,fbKey:k,member:v.member||false,gkClass:v.gkClass||''};}
 
 function loadAllData(){
   setSyncStatus('syncing','Connecting...');
@@ -338,7 +350,7 @@ function loadAllData(){
     children=Object.entries(ch).map(([k,v])=>fbToChild(k,v)).sort((a,b)=>a.name.localeCompare(b.name));
     incidents=Object.values(d.incidents||{}).sort((a,b)=>b.date.localeCompare(a.date));
     deskNotes=Object.values(d.deskNotes||{}).sort((a,b)=>b.timestamp-a.timestamp);
-    
+    sessionSnapshots=Object.values(d.snapshots||{});
     checkInHistory=Object.values(d.checkins||{});
     Object.assign(familyCodes,d.familyCodes||{});
     setSyncStatus('ok',`Loaded ${children.length} children · ${new Date().toLocaleTimeString()}`);
@@ -370,7 +382,12 @@ async function syncDeskNotes(){
   try{await set(ref(db,'data/deskNotes'),Object.fromEntries(deskNotes.map((n,idx)=>[n.id||idx.toString(),n])));}
   catch(e){console.error(e);}
 }
-
+async function syncSnapshots(){
+  try{
+await set(ref(db,'data/snapshots'),Object.fromEntries(sessionSnapshots.map((s,i)=>[i.toString(),{...s,classes:Object.fromEntries(Object.entries(s.classes).map(([k,v])=>[k.replace(/\//g,'_'),v]))}])));
+    await set(ref(db,'data/checkins'),Object.fromEntries(checkInHistory.map((h,i)=>[i.toString(),h])));
+  }catch(e){console.error(e);}
+}
 
 function checkSessionReset(){}
 async function checkoutByCode(){const code=document.getElementById('checkout-code').value.trim();if(!code){return;}const matches=children.filter(c=>c.checkedIn&&c.code===code);const result=document.getElementById('checkout-result');if(!matches.length){result.style.color='#FF3B30';result.textContent='No checked-in children found with that code.';return;}matches.forEach(c=>{c.checkedIn=false;c.cl=mkCL();c.placementCls=null;});await syncChild();renderList();renderDashboard();document.getElementById('checkout-code').value='';result.style.color='#1A7F37';result.style.fontSize='14px';result.style.fontWeight='500';result.textContent=`Checked out: ${matches.map(c=>fullName(c.name)+' ('+c.cls+')').join(', ')}`;
@@ -379,9 +396,9 @@ function checkPassword(){const pw=document.getElementById('login-password').valu
 window.checkPassword=checkPassword;async function startNewSession(){if(!confirm('This will check out all children and clear the session. Are you sure?'))return;sessionResetting=true;children.forEach(c=>{c.checkedIn=false;c.cl=mkCL();c.placementCls=null;});Object.keys(teachers).forEach(k=>{teachers[k]=0;});await set(ref(db,'data/children'),Object.fromEntries(children.map(c=>[c.fbKey||c.name.replace(/[.#$[\]]/g,'_'),childToFb(c)])));await set(ref(db,'data/teachers'),{});await new Promise(r=>setTimeout(r,1000));sessionResetting=false;renderList();renderDashboard();alert('New session started.');}
 window.startNewSession=startNewSession;
 
+setInterval(()=>{const h=now.getHours(),m=now.getMinutes();if((h===13&&m===30)||(h===21&&m===0))saveSnapshot();},60000);
 
-
-
+async function saveSnapshot(){const ds=now.toISOString().split('T')[0];const ci=children.filter(c=>c.checkedIn);if(!ci.length){alert('No children checked in.');return;}const cc={};sessionClasses.forEach(cls=>{cc[cls]=children.filter(c=>c.cls===cls&&c.checkedIn).length;});const sl=session==='morning'?'Morning':'Evening';if(!sessionSnapshots.find(s=>s.date===ds&&s.session===sl)){sessionSnapshots.push({date:ds,session:sl,total:ci.length,classes:cc});ci.forEach(c=>checkInHistory.push({date:ds,session:sl,name:c.name}));await syncSnapshots();}alert(`Snapshot saved: ${ci.length} children.`);}
 
 function showTab(tab,btn){['dashboard','checkin','registration','medical','incidents','desknotes','registry','reports'].forEach(t=>{document.getElementById('tab-'+t).style.display=t===tab?'block':'none';});document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');if(tab==='medical')renderMedical();if(tab==='incidents'){renderIncidents();populateChildSelect();}if(tab==='dashboard')renderDashboard();if(tab==='desknotes')renderDeskNotes();if(tab==='registry'){editingIdx=null;confirmingRemoval=null;renderRegistry('');}if(tab==='reports')generateReports();}
 
@@ -412,7 +429,7 @@ function famSetCheck(idx,field,val){if(pendingFamily&&pendingFamily[idx]){pendin
 window.famSetCheck=famSetCheck;
 function cancelCheckin(){if(pendingFamily){pendingFamily.forEach(m=>{m.pendingCheckin=false;const idx=children.findIndex(x=>x.name===m.name);if(idx>=0){children[idx].checkedIn=false;children[idx].cl=mkCL();children[idx].placementCls=null;}});scheduleSync();pendingFamily=null;pendingFamilyCode=null;}if(pendingCheckinIdx!==null){if(pendingCheckinIdx>=0){children[pendingCheckinIdx].checkedIn=false;renderList();scheduleSync();}pendingCheckinIdx=null;}
 document.getElementById('preview-modal').style.display='none';document.getElementById('overlay').style.display='none';const ma=document.getElementById('preview-modal').querySelector('.modal-actions');if(ma)ma.innerHTML=`<button class="btn blue" style="flex:1;" onclick="printNow()">Print</button><button class="btn" onclick="cancelCheckin()">Cancel</button>`;}
-function printNow(){if(pendingFamily){const selected=pendingFamily.filter((_,idx)=>document.getElementById('fam-cb-'+idx)?.checked);const checkedInSelected=[];const pendingWrites=[];selected.forEach((c,sidx)=>{const idx=children.findIndex(x=>x.name===c.name);if(idx>=0){const ccls=children[idx].cls;if(EARLY_YEARS.includes(ccls)&&!children[idx].sn){const ct=teachers[ccls]||0;const cmax=ct*RATIOS[ccls];const crc=children.filter(x=>!x.sn&&x.cls===ccls&&x.checkedIn).length;if(ct>0&&crc>=cmax){if(children[idx].member){alert(`${ccls} is at capacity. ${fullName(children[idx].name)} cannot be checked in.`);return;}else{const mKids=children.filter(x=>x.member&&x.cls===ccls&&x.checkedIn&&!x.sn);const lastM=mKids.length?fullName(mKids[mKids.length-1].name):null;const msg=lastM?`You will need to check out ${lastM} as ${ccls} is at capacity. Check in ${fullName(children[idx].name)} anyway?`:`${ccls} is at capacity. Check in ${fullName(children[idx].name)} anyway?`;if(!confirm(msg))return;}}}children[idx].checkedIn=true;children[idx].code=pendingFamilyCode;const ciE={id:Date.now()+"_"+sidx,date:now.toISOString().split("T")[0],session:session==="morning"?"Morning":"Evening",name:children[idx].name,cls:children[idx].sn&&children[idx].placementCls?children[idx].placementCls:children[idx].cls,member:children[idx].member||false,sn:children[idx].sn||false};checkInHistory.push(ciE);checkedInSelected.push(c);pendingWrites.push(ciE);if(children[idx].sn){const famIdx=pendingFamily.indexOf(c);const pl=document.getElementById('fam-placement-'+famIdx);children[idx].placementCls=pl?pl.value||null:null;}}});pendingWrites.forEach(e=>set(ref(db,"data/checkins/"+e.id),e));renderList();scheduleSync();let html='';checkedInSelected.forEach(c=>{if(!c.cl)c.cl=mkCL();const i=children.findIndex(x=>x.name===c.name);if(i>=0){children[i].cl=c.cl;html+=buildPrintHTML(i,pendingFamilyCode,true);}else{const tempIdx=children.length;children.push(c);html+=buildPrintHTML(tempIdx,pendingFamilyCode,true);children.pop();}});
+function printNow(){if(pendingFamily){const selected=pendingFamily.filter((_,idx)=>document.getElementById('fam-cb-'+idx)?.checked);const checkedInSelected=[];selected.forEach((c,sidx)=>{const idx=children.findIndex(x=>x.name===c.name);if(idx>=0){const ccls=children[idx].cls;if(EARLY_YEARS.includes(ccls)&&!children[idx].sn){const ct=teachers[ccls]||0;const cmax=ct*RATIOS[ccls];const crc=children.filter(x=>!x.sn&&x.cls===ccls&&x.checkedIn).length;if(ct>0&&crc>=cmax){if(children[idx].member){alert(`${ccls} is at capacity. ${fullName(children[idx].name)} cannot be checked in.`);return;}else{const mKids=children.filter(x=>x.member&&x.cls===ccls&&x.checkedIn&&!x.sn);const lastM=mKids.length?fullName(mKids[mKids.length-1].name):null;const msg=lastM?`You will need to check out ${lastM} as ${ccls} is at capacity. Check in ${fullName(children[idx].name)} anyway?`:`${ccls} is at capacity. Check in ${fullName(children[idx].name)} anyway?`;if(!confirm(msg))return;}}}children[idx].checkedIn=true;children[idx].code=pendingFamilyCode;checkedInSelected.push(c);if(children[idx].sn){const famIdx=pendingFamily.indexOf(c);const pl=document.getElementById('fam-placement-'+famIdx);children[idx].placementCls=pl?pl.value||null:null;}}});renderList();scheduleSync();let html='';checkedInSelected.forEach(c=>{if(!c.cl)c.cl=mkCL();const i=children.findIndex(x=>x.name===c.name);if(i>=0){children[i].cl=c.cl;html+=buildPrintHTML(i,pendingFamilyCode,true);}else{const tempIdx=children.length;children.push(c);html+=buildPrintHTML(tempIdx,pendingFamilyCode,true);children.pop();}});
 
 
 html+=`<div class="pl-sec"><div class="pl-sl">Family security tag</div><div class="pl-sc">${pendingFamilyCode}</div></div>`;document.getElementById('print-area').innerHTML=html;pendingFamily=null;pendingFamilyCode=null;document.getElementById('preview-modal').style.display='none';document.getElementById('overlay').style.display='none';setTimeout(()=>{try{window.print();}catch(e){console.error('Print error:',e);}},300);return;}
@@ -420,9 +437,9 @@ let i=pendingCheckinIdx;if(i===null)return;const isReprint=i<0;if(isReprint)i=-(
 
 function reprintLabels(i){pendingCheckinIdx=-(i+1);document.getElementById('preview-title').textContent=`Reprint labels for ${fullName(children[i].name)}`;document.getElementById('preview-content').innerHTML=buildPreviewHTML(i);document.getElementById('preview-modal').style.display='block';document.getElementById('overlay').style.display='block';}
 
-window.doCheckin=doCheckin;window.cancelCheckin=cancelCheckin;window.printNow=printNow;window.reprintLabels=reprintLabels;
+window.doCheckin=doCheckin;window.cancelCheckin=cancelCheckin;window.printNow=printNow;window.reprintLabels=reprintLabels;window.saveSnapshot=saveSnapshot;
 
-function renderList(){const list=document.getElementById('child-list');const filtered=children.filter(c=>{if(!EV&&['GK1','GK2','GK3'].includes(c.cls)&&!c.sn)return false;if(isInactive(c))return false;const ms=c.name.toLowerCase().includes(currentSearch);if(currentFilter==='all')return ms;if(currentFilter==='checked')return ms&&c.checkedIn;if(currentFilter==='one-to-one')return ms&&c.sn;return ms&&c.cls===currentFilter;}).sort((a,b)=>a.name.localeCompare(b.name));const totalsBar=document.getElementById('class-totals-bar');if(totalsBar){totalsBar.innerHTML=sessionClasses.map(cls=>`<span>${cls}: <strong>${children.filter(c=>c.checkedIn&&c.cls===cls).length}</strong></span>`).join('');}
+function renderList(){const list=document.getElementById('child-list');const filtered=children.filter(c=>{if(!EV&&['GK1','GK2','GK3'].includes(c.cls)&&!c.sn)return false;const ms=c.name.toLowerCase().includes(currentSearch);if(currentFilter==='all')return ms;if(currentFilter==='checked')return ms&&c.checkedIn;if(currentFilter==='one-to-one')return ms&&c.sn;return ms&&c.cls===currentFilter;}).sort((a,b)=>a.name.localeCompare(b.name));const totalsBar=document.getElementById('class-totals-bar');if(totalsBar){totalsBar.innerHTML=sessionClasses.map(cls=>`<span>${cls}: <strong>${children.filter(c=>c.checkedIn&&c.cls===cls).length}</strong></span>`).join('');}
 list.innerHTML=filtered.map(c=>{const i=children.indexOf(c);return`<div class="child-item ${c.checkedIn?'checked-in':''} ${c.sn?'special-needs':''}"><div class="child-header" style="cursor:default;"><div style="flex:1;min-width:0;"><div class="child-header-name">${c.name}${c.sn?'<span class="badge badge-sn">1:1</span>':''}${c.medical?'<span class="badge badge-med">Medical</span>':''}${c.checkedIn?'<span class="badge badge-in">✓ in</span>':''}</div><div class="child-header-meta">${c.cls} · ${c.age||'No DOB'}</div></div><div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">${c.checkedIn?`<button class="btn small" onclick="reprintLabels(${i})">Reprint</button><button class="btn small red" onclick="doCheckout(${i})">Check out</button>`:`<button class="btn small green" onclick="doCheckin(${i})">Check in</button>`}</div></div></div>`;}).join('');renderDashboard();}
 async function doCheckout(i){const members=getFamilyMembers(children[i]).filter(c=>c.checkedIn);if(members.length<=1){children[i].checkedIn=false;children[i].cl=mkCL();children[i].placementCls=null;await syncChild();renderList();renderDashboard();return;}document.getElementById('preview-title').textContent=`Check out — ${members[0].name.split(', ')[0]} family`;document.getElementById('preview-content').innerHTML=`<p style="font-size:12px;color:#6E6E73;margin-bottom:12px;">Select which children to check out.</p>${members.map((c,idx)=>`<div style="display:flex;align-items:center;gap:8px;padding:8px;background:#F9F9FB;border-radius:8px;margin-bottom:6px;border:0.5px solid #D1D1D6;"><input type="checkbox" id="co-fam-${idx}" checked style="width:18px;height:18px;accent-color:#FF3B30;"/><div><div style="font-size:13px;font-weight:500;">${fullName(c.name)}</div><div style="font-size:11px;color:#6E6E73;">${c.cls}</div></div></div>`).join('')}`;const ma=document.getElementById('preview-modal').querySelector('.modal-actions');ma.innerHTML=`<button class="btn red" style="flex:1;" onclick="confirmFamilyCheckout(${JSON.stringify(members.map(c=>children.indexOf(c)))})">Check out selected</button><button class="btn" onclick="closeAllModals()">Cancel</button>`;document.getElementById('preview-modal').style.display='block';document.getElementById('overlay').style.display='block';}
 window.doCheckout=doCheckout;
@@ -479,78 +496,16 @@ function cancelRemove(){confirmingRemoval=null;renderRegistry(document.getElemen
 function confirmRemove(i){children.splice(i,1);confirmingRemoval=null;scheduleSync();renderRegistry(document.getElementById('registry-search').value);renderList();renderDashboard();}
 
 window.renderRegistry=renderRegistry;window.setRegistryFilter=setRegistryFilter;window.startRegMedEdit=startRegMedEdit;
-window.cancelRegMedEdit=cancelRegMedEdit;window.updateRegDraft=updateRegDraft;window.saveRegMed=saveRegMed;window.startEdit=startEdit;window.cancelEdit=cancelEdit;window.toggleEditSn=toggleEditSn;function setMember(i,val){if(children[i])children[i].member=val;}function setInactive(i){children[i].manualInactive=true;scheduleSync();renderRegistry(document.getElementById("registry-search").value);}function setActive(i){children[i].manualInactive=false;scheduleSync();renderRegistry(document.getElementById("registry-search").value);}window.setInactive=setInactive;window.setActive=setActive;function afterEditRender(i){const el=document.getElementById('edit-member-'+i);if(el&&children[i])el.checked=children[i].member||false;}window.setMember=setMember;window.afterEditRender=afterEditRender;
+window.cancelRegMedEdit=cancelRegMedEdit;window.updateRegDraft=updateRegDraft;window.saveRegMed=saveRegMed;window.startEdit=startEdit;window.cancelEdit=cancelEdit;window.toggleEditSn=toggleEditSn;function setMember(i,val){if(children[i])children[i].member=val;}function afterEditRender(i){const el=document.getElementById('edit-member-'+i);if(el&&children[i])el.checked=children[i].member||false;}window.setMember=setMember;window.afterEditRender=afterEditRender;
 window.setMember=setMember;window.saveEdit=saveEdit;window.promptRemove=promptRemove;window.cancelRemove=cancelRemove;window.confirmRemove=confirmRemove;
 
 function renderRegistry(q){const search=(q||'').toLowerCase();renderRegistryFilterRow();const filtered=children.filter(c=>{const ms=c.name.toLowerCase().includes(search)||fullName(c.name).toLowerCase().includes(search);if(registryFilter==='one-to-one')return ms&&c.sn;return registryFilter==='all'?ms:ms&&c.cls===registryFilter;}).sort((a,b)=>a.name.localeCompare(b.name));document.getElementById('registry-total').textContent=children.length;const np=n=>{const p=n.split(', ');return{last:p[0]||'',first:p.slice(1).join(', ')||''};};document.getElementById('registry-list').innerHTML=filtered.map(c=>{const i=children.indexOf(c);const ic=confirmingRemoval===i;const ie=editingIdx===i;const{last,first}=np(c.name);return `<div class="registry-item ${ic?'confirming':''} ${ie?'editing':''}"><div style="flex:1;"><div style="font-size:14px;font-weight:500;">${c.name}${c.sn?'<span class="badge badge-sn">1:1</span>':''}</div><div style="font-size:11px;color:#6E6E73;">${c.cls} · ${c.age||'No DOB'}${c.bday?' · '+c.bday.split('T')[0]:''}
 ${c.language?' · '+c.language:''}${c.medical?' · Medical':''}${c.sn?' · Special needs':''}</div>${c.sn&&c.snNotes?`<div style="font-size:11px;color:#5E5CE6;margin-top:2px;">${c.snNotes}</div>`:''}${ic?`<div style="font-size:16px;color:#000000;margin-top:3px;font-weight:500;">Remove ${c.name}? Cannot be undone.</div>`:''} ${ie?`<div class="edit-form"><div style="font-size:11px;font-weight:600;color:#007AFF;margin-bottom:9px;text-transform:uppercase;letter-spacing:0.5px;">Editing ${c.name}</div><div class="form-grid" style="gap:7px;margin-bottom:7px;"><div class="form-group"><label class="form-label">First name</label><input class="form-input" id="edit-first-${i}" type="text" value="${first}" style="font-size:13px;padding:7px 10px;"/></div><div class="form-group"><label class="form-label">Last name</label><input class="form-input" id="edit-last-${i}" type="text" value="${last}" style="font-size:13px;padding:7px 10px;"/></div><div class="form-group full"><label class="form-label">Date of birth</label><input class="form-input" id="edit-dob-${i}" type="date" value="${c.bday?c.bday.split('T')[0]:''}"
  style="font-size:13px;padding:7px 10px;"/></div><div class="form-group full"><label class="form-label">Language at home</label><input class="form-input" id="edit-lang-${i}" type="text" value="${c.language||''}" style="font-size:13px;padding:7px 10px;"/></div><div class="form-group"><label class="form-label">Parent 1 name</label><input class="form-input" id="edit-p1name-${i}" type="text" value="${c.p1name||''}" style="font-size:13px;padding:7px 10px;"/></div><div class="form-group"><label class="form-label">Parent 1 phone</label><input class="form-input" id="edit-p1phone-${i}" type="tel" value="${c.p1phone||''}" style="font-size:13px;padding:7px 10px;"/></div><div class="form-group"><label class="form-label">Parent 2 name</label><input class="form-input" id="edit-p2name-${i}" type="text" value="${c.p2name||''}" style="font-size:13px;padding:7px 10px;"/></div><div class="form-group"><label class="form-label">Parent 2 phone</label><input class="form-input" id="edit-p2phone-${i}" type="tel" value="${c.p2phone||''}" style="font-size:13px;padding:7px 10px;"/></div><div class="form-group full"><label class="form-label">Medical notes</label><textarea class="form-input" id="edit-medical-${i}" rows="2" style="width:100%;font-size:13px;padding:7px 10px;">${c.medical||''}</textarea></div>${['GK1','GK2','GK3'].includes(c.cls)||c.gkClass?`<div class="form-group full"><label class="form-label">GK Class</label><select class="form-input" id="edit-gkclass-${i}" style="font-size:13px;padding:7px 10px;"><option value="">Auto (age-based)</option><option value="GK1" ${c.gkClass==='GK1'?'selected':''}>GK1</option><option value="GK2" ${c.gkClass==='GK2'?'selected':''}>GK2</option><option value="GK3" ${c.gkClass==='GK3'?'selected':''}>GK3</option></select></div>`:''}</div><div style="background:white;border:0.5px solid #5E5CE6;border-radius:8px;padding:9px;margin-bottom:7px;"><div style="display:flex;align-items:center;gap:7px;"><input type="checkbox" id="edit-sn-${i}" ${c.sn?'checked':''} onchange="toggleEditSn(${i})" style="width:16px;height:16px;accent-color:#5E5CE6;"/><label for="edit-sn-${i}" style="font-size:12px;">Special needs — one-to-one support</label></div><div id="edit-sn-area-${i}" style="display:${c.sn?'block':'none'};margin-top:6px;"><textarea class="form-input" id="edit-sn-notes-${i}" rows="2" style="width:100%;font-size:13px;padding:7px 10px;border-color:#5E5CE6;">${c.snNotes||''}</textarea></div></div><div style="background:white;border:0.5px solid #34C759;border-radius:8px;padding:9px;margin-bottom:7px;"><div style="display:flex;align-items:center;gap:7px;"><input type="checkbox" id="edit-member-${i}" ${c.member?'checked':''} onchange="setMember(${i},this.checked)" style="width:16px;height:16px;accent-color:#34C759;"/>
 <label for="edit-member-${i}" style="font-size:12px;">At least one parent/guardian is a member of Grace Fellowship Church</label></div></div><div style="display:flex;gap:7px;"><button class="btn primary" style="flex:1;padding:8px;" onclick="saveEdit(${i})">Save changes</button><button class="btn" style="padding:8px;" onclick="cancelEdit()">Cancel</button></div></div>`:''} ${!ie&&c.medical&&!ic&&!c.editingRegMed?`<div class="reg-medical-display">${c.medical}</div>`:''} ${c.editingRegMed?`<div class="reg-edit-form"><div style="font-size:15px;font-weight:600;color:#000000;;margin-bottom:5px;">Medical notes</div><textarea class="medical-textarea" rows="2" oninput="updateRegDraft(${i},this.value)" style="width:100%;border-color:#FF3B30;">${c.draftMedical||''}</textarea><div class="save-row"><button class="btn small red" onclick="saveRegMed(${i})">Save</button><button class="btn small" onclick="cancelRegMedEdit(${i})">Cancel</button><span class="saved-ok" id="reg-saved-${i}">Saved.</span></div></div>`:''}</div>${!ie?`<div style="display:flex;gap:5px;flex-shrink:0;margin-top:1px;flex-direction:column;align-items:flex-end;">${ic?`<button class="btn small red" onclick="confirmRemove(${i})">Yes, remove</button><button class="btn small" onclick="cancelRemove()">Cancel</button>`:`<button class="btn small blue" onclick="startEdit(${i})">Edit</button>
-<button class="btn small red" onclick="promptRemove(${i})">Remove</button>${isInactive(c)?`<button class="btn small green" onclick="setActive(${i})">Make Active</button>`:`<button class="btn small" style="border-color:#6E6E73;color:#6E6E73;" onclick="setInactive(${i})">Set Inactive</button>`}${!c.editingRegMed?`<button class="btn small" style="border-color:#FF3B30;color:#000000;" onclick="startRegMedEdit(${i})">${c.medical?'Edit note':'Add note'}</button>`:''}`}</div>`:''}</div>`;}).join('');}
+<button class="btn small red" onclick="promptRemove(${i})">Remove</button>${!c.editingRegMed?`<button class="btn small" style="border-color:#FF3B30;color:#000000;" onclick="startRegMedEdit(${i})">${c.medical?'Edit note':'Add note'}</button>`:''}`}</div>`:''}</div>`;}).join('');}
 
-function getWeekKey(d){const dt=new Date(d);const day=dt.getDay();const diff=dt.getDate()-day+(day===0?-6:1);const mon=new Date(dt.setDate(diff));return mon.toISOString().split("T")[0];}
-function getMonthKey(d){return d.substring(0,7);}
-function getYearKey(d){return d.substring(0,4);}
-function getPeriodKey(d,period){if(period==="weekly")return getWeekKey(d);if(period==="monthly")return getMonthKey(d);return getYearKey(d);}
-function getPeriodLabel(k,period){if(period==="yearly")return k;if(period==="monthly"){const p=k.split("-");return new Date(p[0],p[1]-1).toLocaleDateString("en-CA",{month:"short",year:"numeric"});}const d=new Date(k);return"Wk "+d.toLocaleDateString("en-CA",{month:"short",day:"numeric"});}
-function filterHistory(){const sf=document.getElementById("report-session").value;const cf=document.getElementById("report-class").value;return checkInHistory.filter(h=>(sf==="all"||h.session===sf)&&(cf==="all"||h.cls===cf));}
-function renderProgramChart(){
-  const period=document.getElementById("report-period").value;
-  const sf=document.getElementById("report-session").value;
-  const history=filterHistory();
-  const buckets={};
-  history.forEach(h=>{const k=getPeriodKey(h.date,period);if(!buckets[k])buckets[k]={Morning:0,Evening:0};buckets[k][h.session]=(buckets[k][h.session]||0)+1;});
-  const keys=Object.keys(buckets).sort();
-  const labels=keys.map(k=>getPeriodLabel(k,period));
-  document.getElementById("program-chart-title").textContent="Program attendance — "+period;
-  if(window._programChart)window._programChart.destroy();
-  const datasets=[];
-  if(sf==="all"||sf==="Morning")datasets.push({label:"Morning",data:keys.map(k=>buckets[k].Morning||0),backgroundColor:"#34C759",borderRadius:4});
-  if(sf==="all"||sf==="Evening")datasets.push({label:"Evening",data:keys.map(k=>buckets[k].Evening||0),backgroundColor:"#007AFF",borderRadius:4});
-  window._programChart=new Chart(document.getElementById("program-chart"),{type:"bar",data:{labels,datasets},options:{responsive:true,plugins:{legend:{display:sf==="all"}},scales:{x:{stacked:false},y:{beginAtZero:true}}}});
-}
-function renderClassChart(){
-  const period=document.getElementById("report-period").value;
-  const cf=document.getElementById("report-class").value;
-  const history=filterHistory();
-  const classes=cf==="all"?sessionClasses:[cf];
-  const periodKeys=[...new Set(history.map(h=>getPeriodKey(h.date,period)))].sort();
-  const data={};
-  classes.forEach(cls=>{data[cls]={};periodKeys.forEach(k=>{data[cls][k]=0;});});
-  history.forEach(h=>{const k=getPeriodKey(h.date,period);if(data[h.cls]&&data[h.cls][k]!==undefined)data[h.cls][k]++;});
-  const periodTotals={};
-  periodKeys.forEach(k=>{periodTotals[k]=classes.reduce((s,cls)=>s+(data[cls]?data[cls][k]||0:0),0);});
-  document.getElementById("class-chart-title").textContent="Class breakdown — "+period;
-  if(!periodKeys.length){document.getElementById("class-breakdown-table").innerHTML='<div class="empty-state">No data yet.</div>';return;}
-  const headers=periodKeys.map(k=>getPeriodLabel(k,period));
-  let html='<table class="attendance-table" style="min-width:100%;"><thead><tr><th>Class</th>'+headers.map(h=>'<th>'+h+'</th>').join("")+'<th>Total</th></tr></thead><tbody>';
-  classes.forEach(cls=>{
-    const rowTotal=periodKeys.reduce((s,k)=>s+(data[cls]?data[cls][k]||0:0),0);
-    if(rowTotal===0)return;
-    html+='<tr><td style="font-weight:500;">'+cls+'</td>'+periodKeys.map(k=>'<td>'+((data[cls]&&data[cls][k])||"—")+'</td>').join("")+'<td style="font-weight:600;">'+rowTotal+'</td></tr>';
-  });
-  html+='<tr style="border-top:2px solid #D1D1D6;font-weight:600;background:#F5F5F7;"><td>Total</td>'+periodKeys.map(k=>'<td>'+periodTotals[k]+'</td>').join("")+'<td>'+periodKeys.reduce((s,k)=>s+periodTotals[k],0)+'</td></tr>';
-  html+='</tbody></table>';
-  document.getElementById("class-breakdown-table").innerHTML=html;
-}
-function renderChildTable(){
-  const search=(document.getElementById("child-search")?.value||"").toLowerCase();
-  const sf=document.getElementById("report-session").value;
-  const history=filterHistory();
-  const counts={};
-  history.forEach(h=>{if(!counts[h.name])counts[h.name]={morning:0,evening:0,cls:h.cls,member:h.member};if(h.session==="Morning")counts[h.name].morning++;else counts[h.name].evening++;});
-  let rows=Object.entries(counts).sort((a,b)=>a[0].localeCompare(b[0]));
-  if(search)rows=rows.filter(([name])=>name.toLowerCase().includes(search)||fullName(name).toLowerCase().includes(search));
-  const table=document.getElementById("child-attendance-table");
-  if(!rows.length){table.innerHTML='<div class="empty-state">No attendance data found.</div>';return;}
-  table.innerHTML='<table class="attendance-table"><thead><tr><th>Name</th><th>Class</th><th>Member</th>'+(sf==="all"?"<th>Morning</th><th>Evening</th>":"")+'<th>Total</th></tr></thead><tbody>'+rows.map(([name,d])=>'<tr><td>'+fullName(name)+'</td><td>'+( d.cls||"—")+'</td><td>'+( d.member?"✓":"")+'</td>'+(sf==="all"?"<td>"+(d.morning||"—")+"</td><td>"+(d.evening||"—")+"</td>":"")+'<td style="font-weight:600;">'+( d.morning+d.evening)+'</td></tr>').join("")+'</tbody></table>';
-}
-window.renderChildTable=renderChildTable;
-function generateReports(){
-  const clsSel=document.getElementById("report-class");
-  if(clsSel.options.length===1){sessionClasses.forEach(cls=>{const o=document.createElement("option");o.value=cls;o.textContent=cls;clsSel.appendChild(o);});}
-  renderProgramChart();renderClassChart();renderChildTable();
-}
+function generateReports(){const from=document.getElementById('report-from').value;const to=document.getElementById('report-to').value;const sf=document.getElementById('report-session').value;if(!from||!to)return;const filtered=sessionSnapshots.filter(s=>s.date>=from&&s.date<=to&&(sf==='all'||s.session===sf)).sort((a,b)=>a.date.localeCompare(b.date)||a.session.localeCompare(b.session));const sl=sf==='all'?'All sessions':sf+' only';document.getElementById('line-chart-title').textContent=`Attendance trend — ${sl}`;if(lineChartInst)lineChartInst.destroy();lineChartInst=new Chart(document.getElementById('line-chart'),{type:'line',data:{labels:filtered.map(s=>s.date.slice(5)+' '+s.session.slice(0,1)),datasets:[{label:'Total',data:filtered.map(s=>s.total),borderColor:'#007AFF',backgroundColor:'rgba(0,122,255,0.1)',tension:0.3,fill:true,pointBackgroundColor:'#007AFF',pointRadius:4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});document.getElementById('bar-chart-title').textContent=`Class breakdown — ${sl}`;const allCls=[...new Set(filtered.flatMap(s=>Object.keys(s.classes)))];const colors=['#007AFF','#34C759','#FF9500','#FF3B30','#5E5CE6','#FF2D55','#30D158'];if(barChartInst)barChartInst.destroy();barChartInst=new Chart(document.getElementById('bar-chart'),{type:'bar',data:{labels:allCls,datasets:[{label:'Total',data:allCls.map(cls=>filtered.reduce((s,snap)=>s+(snap.classes[cls]||0),0)),backgroundColor:allCls.map((_,i)=>colors[i%colors.length]),borderRadius:4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});const hf=checkInHistory.filter(h=>h.date>=from&&h.date<=to&&(sf==='all'||h.session===sf));const counts={};hf.forEach(h=>{if(!counts[h.name])counts[h.name]={morning:0,evening:0};if(h.session==='Morning')counts[h.name].morning++;else counts[h.name].evening++;});const sorted=Object.entries(counts).sort((a,b)=>a[0].localeCompare(b[0]));const table=document.getElementById('child-attendance-table');if(!sorted.length){table.innerHTML='<div class="empty-state">No attendance data for this period.</div>';return;}table.innerHTML=`<table class="attendance-table"><thead><tr><th>Name</th>${sf==='all'?'<th>Morning</th><th>Evening</th>':''}<th>Total</th></tr></thead><tbody>${sorted.map(([name,c])=>`<tr><td>${name}</td>${sf==='all'?`<td>${c.morning||'—'}</td><td>${c.evening||'—'}</td>`:''}<td style="font-weight:600;">${c.morning+c.evening}</td></tr>`).join('')}</tbody></table>`;}
 window.generateReports=generateReports;
 onValue(ref(db,'data/teachers'),snap=>{const t=snap.val()||{};Object.keys(t).forEach(k=>{if(document.activeElement.className!=='teacher-input')teachers[k]=t[k];});renderDashboard();});
 
