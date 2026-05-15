@@ -172,7 +172,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <div class="top-bar">
     <div><div class="app-title">Early Years / Grace Kids</div><div class="app-date" id="today-date"></div></div>
     <div style="display:flex;gap:8px;align-items:center;">
-<button class="btn small" onclick="saveSnapshot()">Save snapshot</button><button class="btn small" onclick="startNewSession()" style="background:#FF3B30;color:white;border-color:#FF3B30;">Start new session</button>
+<button class="btn small" onclick="startNewSession()" style="background:#FF3B30;color:white;border-color:#FF3B30;">Start new session</button>
       <div id="session-badge" class="session-badge"></div>
     </div>
   </div>
@@ -300,7 +300,7 @@ const MORNING_PLACEMENT=['Infant','Walkers','Preschool','Kindergarten'];
 const EVENING_PLACEMENT=['Infant/Walkers','Preschool','Kindergarten'];
 const sessionClasses=EV?EVENING_CLASSES:MORNING_CLASSES;
 const placementOptions=EV?EVENING_PLACEMENT:MORNING_PLACEMENT;
-let children=[],incidents=[],deskNotes=[],sessionSnapshots=[],checkInHistory=[];
+let children=[],incidents=[],deskNotes=[],checkInHistory=[];
 let currentFilter='all',currentSearch='',registryFilter='all';
 let confirmingRemoval=null,editingIdx=null,pendingCheckinIdx=null,pendingFamily=null,pendingFamilyCode=null;
 let lineChartInst=null,barChartInst=null,syncTimeout=null;
@@ -338,7 +338,7 @@ function loadAllData(){
     children=Object.entries(ch).map(([k,v])=>fbToChild(k,v)).sort((a,b)=>a.name.localeCompare(b.name));
     incidents=Object.values(d.incidents||{}).sort((a,b)=>b.date.localeCompare(a.date));
     deskNotes=Object.values(d.deskNotes||{}).sort((a,b)=>b.timestamp-a.timestamp);
-    sessionSnapshots=Object.values(d.snapshots||{});
+    
     checkInHistory=Object.values(d.checkins||{});
     Object.assign(familyCodes,d.familyCodes||{});
     setSyncStatus('ok',`Loaded ${children.length} children · ${new Date().toLocaleTimeString()}`);
@@ -370,12 +370,7 @@ async function syncDeskNotes(){
   try{await set(ref(db,'data/deskNotes'),Object.fromEntries(deskNotes.map((n,idx)=>[n.id||idx.toString(),n])));}
   catch(e){console.error(e);}
 }
-async function syncSnapshots(){
-  try{
-await set(ref(db,'data/snapshots'),Object.fromEntries(sessionSnapshots.map((s,i)=>[i.toString(),{...s,classes:Object.fromEntries(Object.entries(s.classes).map(([k,v])=>[k.replace(/\//g,'_'),v]))}])));
-    await set(ref(db,'data/checkins'),Object.fromEntries(checkInHistory.map((h,i)=>[i.toString(),h])));
-  }catch(e){console.error(e);}
-}
+
 
 function checkSessionReset(){}
 async function checkoutByCode(){const code=document.getElementById('checkout-code').value.trim();if(!code){return;}const matches=children.filter(c=>c.checkedIn&&c.code===code);const result=document.getElementById('checkout-result');if(!matches.length){result.style.color='#FF3B30';result.textContent='No checked-in children found with that code.';return;}matches.forEach(c=>{c.checkedIn=false;c.cl=mkCL();c.placementCls=null;});await syncChild();renderList();renderDashboard();document.getElementById('checkout-code').value='';result.style.color='#1A7F37';result.style.fontSize='14px';result.style.fontWeight='500';result.textContent=`Checked out: ${matches.map(c=>fullName(c.name)+' ('+c.cls+')').join(', ')}`;
@@ -384,9 +379,9 @@ function checkPassword(){const pw=document.getElementById('login-password').valu
 window.checkPassword=checkPassword;async function startNewSession(){if(!confirm('This will check out all children and clear the session. Are you sure?'))return;sessionResetting=true;children.forEach(c=>{c.checkedIn=false;c.cl=mkCL();c.placementCls=null;});Object.keys(teachers).forEach(k=>{teachers[k]=0;});await set(ref(db,'data/children'),Object.fromEntries(children.map(c=>[c.fbKey||c.name.replace(/[.#$[\]]/g,'_'),childToFb(c)])));await set(ref(db,'data/teachers'),{});await new Promise(r=>setTimeout(r,1000));sessionResetting=false;renderList();renderDashboard();alert('New session started.');}
 window.startNewSession=startNewSession;
 
-setInterval(()=>{const h=now.getHours(),m=now.getMinutes();if((h===13&&m===30)||(h===21&&m===0))saveSnapshot();},60000);
 
-async function saveSnapshot(){const ds=now.toISOString().split('T')[0];const ci=children.filter(c=>c.checkedIn);if(!ci.length){alert('No children checked in.');return;}const cc={};sessionClasses.forEach(cls=>{cc[cls]=children.filter(c=>c.cls===cls&&c.checkedIn).length;});const sl=session==='morning'?'Morning':'Evening';if(!sessionSnapshots.find(s=>s.date===ds&&s.session===sl)){sessionSnapshots.push({date:ds,session:sl,total:ci.length,classes:cc});ci.forEach(c=>checkInHistory.push({date:ds,session:sl,name:c.name}));await syncSnapshots();}alert(`Snapshot saved: ${ci.length} children.`);}
+
+
 
 function showTab(tab,btn){['dashboard','checkin','registration','medical','incidents','desknotes','registry','reports'].forEach(t=>{document.getElementById('tab-'+t).style.display=t===tab?'block':'none';});document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');if(tab==='medical')renderMedical();if(tab==='incidents'){renderIncidents();populateChildSelect();}if(tab==='dashboard')renderDashboard();if(tab==='desknotes')renderDeskNotes();if(tab==='registry'){editingIdx=null;confirmingRemoval=null;renderRegistry('');}if(tab==='reports')generateReports();}
 
@@ -425,7 +420,7 @@ let i=pendingCheckinIdx;if(i===null)return;const isReprint=i<0;if(isReprint)i=-(
 
 function reprintLabels(i){pendingCheckinIdx=-(i+1);document.getElementById('preview-title').textContent=`Reprint labels for ${fullName(children[i].name)}`;document.getElementById('preview-content').innerHTML=buildPreviewHTML(i);document.getElementById('preview-modal').style.display='block';document.getElementById('overlay').style.display='block';}
 
-window.doCheckin=doCheckin;window.cancelCheckin=cancelCheckin;window.printNow=printNow;window.reprintLabels=reprintLabels;window.saveSnapshot=saveSnapshot;
+window.doCheckin=doCheckin;window.cancelCheckin=cancelCheckin;window.printNow=printNow;window.reprintLabels=reprintLabels;
 
 function renderList(){const list=document.getElementById('child-list');const filtered=children.filter(c=>{if(!EV&&['GK1','GK2','GK3'].includes(c.cls)&&!c.sn)return false;if(isInactive(c))return false;const ms=c.name.toLowerCase().includes(currentSearch);if(currentFilter==='all')return ms;if(currentFilter==='checked')return ms&&c.checkedIn;if(currentFilter==='one-to-one')return ms&&c.sn;return ms&&c.cls===currentFilter;}).sort((a,b)=>a.name.localeCompare(b.name));const totalsBar=document.getElementById('class-totals-bar');if(totalsBar){totalsBar.innerHTML=sessionClasses.map(cls=>`<span>${cls}: <strong>${children.filter(c=>c.checkedIn&&c.cls===cls).length}</strong></span>`).join('');}
 list.innerHTML=filtered.map(c=>{const i=children.indexOf(c);return`<div class="child-item ${c.checkedIn?'checked-in':''} ${c.sn?'special-needs':''}"><div class="child-header" style="cursor:default;"><div style="flex:1;min-width:0;"><div class="child-header-name">${c.name}${c.sn?'<span class="badge badge-sn">1:1</span>':''}${c.medical?'<span class="badge badge-med">Medical</span>':''}${c.checkedIn?'<span class="badge badge-in">✓ in</span>':''}</div><div class="child-header-meta">${c.cls} · ${c.age||'No DOB'}</div></div><div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">${c.checkedIn?`<button class="btn small" onclick="reprintLabels(${i})">Reprint</button><button class="btn small red" onclick="doCheckout(${i})">Check out</button>`:`<button class="btn small green" onclick="doCheckin(${i})">Check in</button>`}</div></div></div>`;}).join('');renderDashboard();}
@@ -443,7 +438,7 @@ ${over?`<div style="font-size:14px;color:#000000;font-weight:600;margin-top:3px;
 const max=GK_MAX[cls];const oc=rc>0&&rc>max;const tf=rc>0&&t<2;over=oc||tf;if(oc)allW.push(`${cls}: over cap`);if(tf)allW.push(`${cls}: <2 teachers`);return `<div class="class-card ${over?'over':''}" onclick="openClassPopup('${cls}')"><div class="class-card-name">${cls} </div><div class="class-card-count">${all} <span style="font-size:14px;font-weight:400;">in</span></div><div class="class-card-detail">${tot} reg · Max ${max}${sn>0?` · ${sn} 1:1`:''}</div><div class="teacher-row" onclick="event.stopPropagation()"><input class="teacher-input" type="number" min="0" value="${t}" onchange="setTeachers('${cls}',this.value)"/><span class="teacher-label">${t} teachers · min 2</span></div>${over?`<div style="font-size:14px;color:#000000;font-weight:600;margin-top:3px;">${oc?'Over cap':''}${oc&&tf?' · ':''}${tf?'Min 2':''}</div>`:''}</div>`;}}).join('');const snCI=children.filter(c=>c.sn&&c.checkedIn&&(!c.placementCls||c.placementCls==='')).length;const snT=teachers['One-to-One']||0;const snTF=snCI>0&&snT<2;if(snTF)allW.push('One-to-one: <2 workers');document.getElementById('class-cards').innerHTML=regular+`<div class="class-card one-to-one ${snTF?'over':''}" onclick="openClassPopup('One-to-One')"><div class="class-card-name" style="color:#5E5CE6;">One-to-one Care</div><div class="class-card-count">${snCI} <span style="font-size:14px;font-weight:400;">in</span></div><div class="class-card-detail">${children.filter(c=>c.sn).length} reg · min 2 workers</div><div class="teacher-row" onclick="event.stopPropagation()"><input class="teacher-input" type="number" min="0" value="${snT}" onchange="setTeachers('One-to-One',this.value)" style="border-color:#5E5CE6;"/><span class="teacher-label">${snT} workers · min 2</span></div>${snTF?`<div style="font-size:14px;color:#000000;font-weight:600;margin-top:3px;">Min 2 required</div>`:''}</div>`;const redW=allW.filter(w=>!w.startsWith('yellow:'));const yelW=allW.filter(w=>w.startsWith('yellow:')).map(w=>w.replace('yellow:',''));document.getElementById('warning-area').innerHTML=(redW.length?`<div class="warning-box">⚠ ${redW.join(' · ')}</div>`:'')+( yelW.length?`<div class="warning-box-yellow">⚠ ${yelW.join(' · ')}</div>`:'');
 }
 
-function openClassPopup(cls){let inClass=cls==='One-to-One'?children.filter(c=>c.sn&&c.checkedIn&&!placementOptions.includes(c.placementCls)):children.filter(c=>{if(!c.checkedIn)return false;if(c.sn)return c.placementCls===cls||(!c.placementCls&&c.cls===cls);return c.cls===cls;});inClass=inClass.sort((a,b)=>{if(a.medical&&!b.medical)return-1;if(!a.medical&&b.medical)return 1;return a.name.localeCompare(b.name);});document.getElementById('popup-title').textContent=`${cls} — ${inClass.length} checked in`;document.getElementById('popup-list').innerHTML=inClass.length?inClass.map(c=>`<div class="popup-child-row ${c.medical?'has-medical':''}"><div><div style="font-size:13px;font-weight:500;color:${c.medical?'#CC0000':'#1D1D1F'};">${c.name}${c.sn?'<span class="badge badge-sn">1:1</span>':''}${c.medical?'<span class="badge badge-med">Medical</span>':''}</div>${c.medical?`<div style="font-size:11px;color:#CC0000;margin-top:2px;">${c.medical}</div>`:''}<div style="font-size:11px;color:#6E6E73;">${c.age||'No DOB'}${c.sn&&c.placementCls?' · '+c.placementCls:''}</div></div></div>`).join(''):'<div style="padding:1rem;color:#6E6E73;font-size:13px;">No children in this class.</div>';document.getElementById('class-popup').style.display='block';document.getElementById('overlay').style.display='block';}
+function openClassPopup(cls){let inClass=cls==='One-to-One'?children.filter(c=>c.sn&&c.checkedIn):children.filter(c=>{if(!c.checkedIn)return false;if(c.sn)return c.placementCls===cls||(!c.placementCls&&c.cls===cls);return c.cls===cls;});inClass=inClass.sort((a,b)=>{if(a.medical&&!b.medical)return-1;if(!a.medical&&b.medical)return 1;return a.name.localeCompare(b.name);});document.getElementById('popup-title').textContent=`${cls} — ${inClass.length} checked in`;document.getElementById('popup-list').innerHTML=inClass.length?inClass.map(c=>`<div class="popup-child-row ${c.medical?'has-medical':''}"><div><div style="font-size:13px;font-weight:500;color:${c.medical?'#CC0000':'#1D1D1F'};">${c.name}${c.sn?'<span class="badge badge-sn">1:1</span>':''}${c.medical?'<span class="badge badge-med">Medical</span>':''}</div>${c.medical?`<div style="font-size:11px;color:#CC0000;margin-top:2px;">${c.medical}</div>`:''}<div style="font-size:11px;color:#6E6E73;">${c.age||'No DOB'}${c.sn&&c.placementCls?' · '+c.placementCls:''}</div></div></div>`).join(''):'<div style="padding:1rem;color:#6E6E73;font-size:13px;">No children in this class.</div>';document.getElementById('class-popup').style.display='block';document.getElementById('overlay').style.display='block';}
 function setTeachers(cls,val){teachers[cls]=Math.max(0,parseInt(val)||0);set(ref(db,'data/teachers/'+cls),teachers[cls]);renderDashboard();}
 
 function closeAllModals(){document.getElementById('class-popup').style.display='none';document.getElementById('overlay').style.display='none';if(document.getElementById('preview-modal').style.display==='block')cancelCheckin();document.getElementById('preview-modal').style.display='none';const ma=document.getElementById('preview-modal').querySelector('.modal-actions');if(ma)ma.innerHTML=`<button class="btn blue" style="flex:1;" onclick="printNow()">Print</button><button class="btn" onclick="cancelCheckin()">Cancel</button>`;}
