@@ -309,9 +309,7 @@ let familyCodes={};
 function getFamilyCode(c){const fk=getFamilyKey(c).replace(/[.#$[\]|]/g,'_');const sessionKey=now.toISOString().split('T')[0]+'_'+session;const storeKey=fk+'_'+sessionKey;if(!familyCodes[storeKey]){familyCodes[storeKey]=genCode();setTimeout(()=>set(ref(db,'data/familyCodes/'+storeKey),familyCodes[storeKey]),2000);}return familyCodes[storeKey];}
 document.getElementById('today-date').textContent=now.toLocaleDateString('en-CA',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
 document.getElementById('desk-date').value=now.toISOString().split('T')[0];
-const t30=new Date(now);t30.setDate(t30.getDate()-30);
-document.getElementById('report-from').value=t30.toISOString().split('T')[0];
-document.getElementById('report-to').value=now.toISOString().split('T')[0];
+
 const sb=document.getElementById('session-badge');
 sb.textContent=session==='morning'?'Morning session':'Evening session';
 sb.className='session-badge '+(session==='morning'?'session-morning':'session-evening');
