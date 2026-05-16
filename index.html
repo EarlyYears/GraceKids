@@ -177,7 +177,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     </div>
   </div>
   <div class="sync-bar"><div class="sync-dot syncing" id="sync-dot"></div><span id="sync-status">Connecting...</span></div>
-  <div id="session-summary" style="background:white;border:0.5px solid #D1D1D6;border-radius:10px;padding:7px 14px;margin-bottom:1rem;font-size:14px;font-weight:500;color:#1D1D1F;text-align:center;"></div><div id="warning-area"></div>
+  <div id="warning-area"></div>
   <div class="tab-bar">
     <button class="tab active" onclick="showTab('dashboard',this)">Dashboard</button>
     <button class="tab" onclick="showTab('checkin',this)">Check in / out</button>
@@ -188,15 +188,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <button class="tab" onclick="showTab('registry',this)">Registry</button>
     <button class="tab" onclick="showTab('reports',this)">Reports</button>
   </div>
-  <div id="tab-dashboard"><div class="dashboard" id="class-cards"></div></div>
+  <div id="tab-dashboard"><div id="session-summary" style="background:white;border:0.5px solid #D1D1D6;border-radius:10px;padding:7px 14px;margin-bottom:1rem;font-size:14px;font-weight:500;color:#1D1D1F;text-align:center;"></div><div class="dashboard" id="class-cards"></div></div>
   <div id="tab-checkin" style="display:none;">
-<div class="totals-bar" id="class-totals-bar"></div>
-<div style="background:white;border:0.5px solid #D1D1D6;border-radius:12px;padding:12px;margin-bottom:1rem;"><div style="font-size:11px;font-weight:600;color:#6E6E73;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Check out by security code</div><div style="display:flex;gap:8px;"><input id="checkout-code" type="number" placeholder="Enter 4-digit code" style="flex:1;padding:9px 11px;font-size:15px;border:0.5px solid #D1D1D6;border-radius:8px;background:#F9F9FB;" onkeydown="if(event.key==='Enter')checkoutByCode()"/><button class="btn green" onclick="checkoutByCode()">Check out</button></div><div id="checkout-result" style="margin-top:8px;font-size:12px;color:#6E6E73;"></div><div style="margin-top:10px;border-top:0.5px solid #D1D1D6;padding-top:10px;"><div style="font-size:11px;font-weight:600;color:#6E6E73;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Check out by name</div><input id="checkout-name" type="text" placeholder="Search first or last name..." style="width:100%;padding:9px 11px;font-size:15px;border:0.5px solid #D1D1D6;border-radius:8px;background:#F9F9FB;" oninput="searchCheckoutByName(this.value)"/><div id="checkout-name-results" style="margin-top:8px;"></div></div></div>
-<input class="search-bar" type="search" placeholder="Search by name..." oninput="filterChildren(this.value)"/>
-    <div class="filter-row" id="filter-row"></div>
-    <p style="font-size:11px;color:#6E6E73;margin-bottom:9px;">Tap a child's name to expand. Check in shows a label preview before printing.</p>
-    <div class="child-list" id="child-list"></div>
-  </div>
+<div style="background:white;border:0.5px solid #D1D1D6;border-radius:12px;padding:12px;margin-bottom:1rem;">
+  <div style="font-size:11px;font-weight:600;color:#6E6E73;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Check in / out by name</div>
+  <input id="checkout-name" type="text" placeholder="Search first or last name..." style="width:100%;padding:9px 11px;font-size:15px;border:0.5px solid #D1D1D6;border-radius:8px;background:#F9F9FB;margin-bottom:6px;" oninput="searchCheckoutByName(this.value)"/>
+  <div id="checkout-name-results"></div>
+</div>
+<div style="background:white;border:0.5px solid #D1D1D6;border-radius:12px;padding:12px;margin-bottom:1rem;">
+  <div style="font-size:11px;font-weight:600;color:#6E6E73;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Check out by security code</div>
+  <div style="display:flex;gap:8px;"><input id="checkout-code" type="number" placeholder="Enter 4-digit code" style="flex:1;padding:9px 11px;font-size:15px;border:0.5px solid #D1D1D6;border-radius:8px;background:#F9F9FB;" onkeydown="if(event.key==='Enter')checkoutByCode()"/><button class="btn green" onclick="checkoutByCode()">Check out</button></div>
+  <div id="checkout-result" style="margin-top:8px;font-size:12px;color:#6E6E73;"></div>
+</div>
+<div class="filter-row" id="filter-row"></div>
+<div class="child-list" id="child-list"></div>
+</div>
   <div id="tab-registration" style="display:none;">
     <div class="success-banner" id="success-banner"></div>
     <div class="form-card"><div class="section-title">Child information</div><div class="form-grid">
@@ -439,7 +445,7 @@ function reprintLabels(i){const members=getFamilyMembers(children[i]).filter(c=>
 
 window.doCheckin=doCheckin;window.cancelCheckin=cancelCheckin;window.printNow=printNow;window.reprintLabels=reprintLabels;window.saveSnapshot=saveSnapshot;
 
-function renderList(){const list=document.getElementById('child-list');const inactiveMap=buildInactiveMap();const filtered=children.filter(c=>{if(!EV&&['GK1','GK2','GK3'].includes(c.cls)&&!c.sn)return false;if(isInactive(c,inactiveMap))return false;const ms=c.name.toLowerCase().includes(currentSearch);if(currentFilter==='all')return ms;if(currentFilter==='checked')return ms&&c.checkedIn;if(currentFilter==='one-to-one')return ms&&c.sn;return ms&&c.cls===currentFilter;}).sort((a,b)=>a.name.localeCompare(b.name));const totalsBar=document.getElementById('class-totals-bar');if(totalsBar){totalsBar.innerHTML=sessionClasses.map(cls=>`<span>${cls}: <strong>${children.filter(c=>c.checkedIn&&c.cls===cls).length}</strong></span>`).join('');}
+function renderList(){const list=document.getElementById('child-list');const inactiveMap=buildInactiveMap();const filtered=children.filter(c=>{if(!EV&&['GK1','GK2','GK3'].includes(c.cls)&&!c.sn)return false;if(isInactive(c,inactiveMap))return false;const ms=c.name.toLowerCase().includes(currentSearch);if(currentFilter==='all')return ms;if(currentFilter==='checked')return ms&&c.checkedIn;if(currentFilter==='one-to-one')return ms&&c.sn;return ms&&c.cls===currentFilter;}).sort((a,b)=>a.name.localeCompare(b.name));
 list.innerHTML=filtered.map(c=>{const i=children.indexOf(c);return`<div class="child-item ${c.checkedIn?'checked-in':''} ${c.sn?'special-needs':''}"><div class="child-header" style="cursor:default;"><div style="flex:1;min-width:0;"><div class="child-header-name">${c.name}${c.sn?'<span class="badge badge-sn">1:1</span>':''}${isInactive(c)?'<span class="badge" style="background:#E5E5EA;color:#6E6E73;">Inactive</span>':''}${c.medical?'<span class="badge badge-med">Medical</span>':''}${c.checkedIn?'<span class="badge badge-in">✓ in</span>':''}</div><div class="child-header-meta">${c.cls} · ${c.age||'No DOB'}</div></div><div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">${c.checkedIn?`<button class="btn small" onclick="reprintLabels(${i})">Reprint</button><button class="btn small red" onclick="doCheckout(${i})">Check out</button>`:`<button class="btn small green" onclick="doCheckin(${i})">Check in</button>`}</div></div></div>`;}).join('');renderDashboard();}
 async function doCheckout(i){const members=getFamilyMembers(children[i]).filter(c=>c.checkedIn);if(members.length<=1){children[i].checkedIn=false;children[i].cl=mkCL();children[i].placementCls=null;await syncChild();renderList();renderDashboard();return;}document.getElementById('preview-title').textContent=`Check out — ${members[0].name.split(', ')[0]} family`;document.getElementById('preview-content').innerHTML=`<p style="font-size:12px;color:#6E6E73;margin-bottom:12px;">Select which children to check out.</p>${members.map((c,idx)=>`<div style="display:flex;align-items:center;gap:8px;padding:8px;background:#F9F9FB;border-radius:8px;margin-bottom:6px;border:0.5px solid #D1D1D6;"><input type="checkbox" id="co-fam-${idx}" checked style="width:18px;height:18px;accent-color:#FF3B30;"/><div><div style="font-size:13px;font-weight:500;">${fullName(c.name)}</div><div style="font-size:11px;color:#6E6E73;">${c.cls}</div></div></div>`).join('')}`;const ma=document.getElementById('preview-modal').querySelector('.modal-actions');ma.innerHTML=`<button class="btn red" style="flex:1;" onclick="confirmFamilyCheckout(${JSON.stringify(members.map(c=>children.indexOf(c)))})">Check out selected</button><button class="btn" onclick="closeAllModals()">Cancel</button>`;document.getElementById('preview-modal').style.display='block';document.getElementById('overlay').style.display='block';}
 window.doCheckout=doCheckout;
