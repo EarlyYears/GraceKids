@@ -324,7 +324,7 @@ document.getElementById('desk-date').value=now.toISOString().split('T')[0];
 
 
 
-function updateSessionBadge(){const sb=document.getElementById('session-badge');if(!sb)return;const manual=!!(sessionOverride&&sessionOverride.date===sessionDateKey());sb.textContent=(session==='morning'?'Morning':'Evening')+' session'+(manual?' (manual)':'');sb.className='session-badge '+(session==='morning'?'session-morning':'session-evening');sb.style.cursor='pointer';sb.title='Tap to switch between morning and evening';}
+function updateSessionBadge(){const sb=document.getElementById('session-badge');if(!sb)return;sb.textContent=(session==='morning'?'Morning':'Evening')+' session';sb.className='session-badge '+(session==='morning'?'session-morning':'session-evening');sb.style.cursor='pointer';sb.title='Tap to switch between morning and evening';}
 function applySession(){session=computeSession();EV=session==='evening';sessionClasses=EV?EVENING_CLASSES:MORNING_CLASSES;children.forEach(c=>{c.cls=assignClass(c.bday||null,c.gkClass||'');});updateSessionBadge();renderFilterRow();renderList();renderDashboard();}
 function toggleSession(){const next=session==='morning'?'evening':'morning';sessionOverride={date:sessionDateKey(),value:next};set(ref(db,'data/sessionOverride'),sessionOverride);applySession();}
 window.toggleSession=toggleSession;
