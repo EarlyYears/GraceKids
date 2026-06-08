@@ -173,7 +173,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div><div class="app-title">Early Years / Grace Kids</div><div class="app-date" id="today-date"></div></div>
     <div style="display:flex;gap:8px;align-items:center;">
 <button class="btn small blue" onclick="testPrint()">Test print</button><button class="btn small" onclick="startNewSession()" style="background:#FF3B30;color:white;border-color:#FF3B30;">Start new session</button>
-      <div id="session-badge" class="session-badge"></div>
+      <div id="session-badge" class="session-badge" onclick="toggleSession()" style="cursor:pointer;"></div>
     </div>
   </div>
   <div class="sync-bar"><div class="sync-dot syncing" id="sync-dot"></div><span id="sync-status">Connecting...</span></div>
@@ -295,8 +295,12 @@ const db = getDatabase(app);
 
 const now=new Date();
 const timeVal=now.getHours()*60+now.getMinutes();
-const session=(timeVal>=8*60&&timeVal<13*60+30)?'morning':'evening';
-const EV=session==='evening';
+const autoSession=(timeVal>=8*60&&timeVal<13*60+30)?'morning':'evening';
+function sessionDateKey(){return now.toISOString().split('T')[0];}
+let sessionOverride=null;
+function computeSession(){return (sessionOverride&&sessionOverride.date===sessionDateKey()&&(sessionOverride.value==='morning'||sessionOverride.value==='evening'))?sessionOverride.value:autoSession;}
+let session=computeSession();
+let EV=session==='evening';
 const EIGHT_WEEKS=8*7*24*60*60*1000;
 const MORNING_CLASSES=['Nursery','Preschool','Kindergarten'];
 const EVENING_CLASSES=['Nursery','Preschool','Kindergarten','GK1','GK2','GK3'];
@@ -306,7 +310,7 @@ const GK_MAX={GK1:24,GK2:30,GK3:30};
 const teachers={Nursery:0,Preschool:0,Kindergarten:0,GK1:0,GK2:0,GK3:0,'One-to-One':0};const snWorkers={Nursery:0,Preschool:0,Kindergarten:0,GK1:0,GK2:0,GK3:0};
 const MORNING_PLACEMENT=['Nursery','Preschool','Kindergarten'];
 const EVENING_PLACEMENT=['Nursery','Preschool','Kindergarten'];
-const sessionClasses=EV?EVENING_CLASSES:MORNING_CLASSES;
+let sessionClasses=EV?EVENING_CLASSES:MORNING_CLASSES;
 const placementOptions=EV?EVENING_PLACEMENT:MORNING_PLACEMENT;
 let children=[],incidents=[],deskNotes=[],sessionSnapshots=[],checkInHistory=[];
 let currentFilter='all',currentSearch='',registryFilter='all';
@@ -320,9 +324,11 @@ document.getElementById('desk-date').value=now.toISOString().split('T')[0];
 
 
 
-const sb=document.getElementById('session-badge');
-sb.textContent=session==='morning'?'Morning session':'Evening session';
-sb.className='session-badge '+(session==='morning'?'session-morning':'session-evening');
+function updateSessionBadge(){const sb=document.getElementById('session-badge');if(!sb)return;const manual=!!(sessionOverride&&sessionOverride.date===sessionDateKey());sb.textContent=(session==='morning'?'Morning':'Evening')+' session'+(manual?' (manual)':'');sb.className='session-badge '+(session==='morning'?'session-morning':'session-evening');sb.style.cursor='pointer';sb.title='Tap to switch between morning and evening';}
+function applySession(){session=computeSession();EV=session==='evening';sessionClasses=EV?EVENING_CLASSES:MORNING_CLASSES;children.forEach(c=>{c.cls=assignClass(c.bday||null,c.gkClass||'');});updateSessionBadge();renderFilterRow();renderList();renderDashboard();}
+function toggleSession(){const next=session==='morning'?'evening':'morning';sessionOverride={date:sessionDateKey(),value:next};set(ref(db,'data/sessionOverride'),sessionOverride);applySession();}
+window.toggleSession=toggleSession;
+updateSessionBadge();
 
 function getAgeMonths(b){if(!b)return null;const p=String(b).split('-');if(p.length<3)return null;const by=parseInt(p[0],10),bm=parseInt(p[1],10)-1,bd=parseInt(p[2],10);if(isNaN(by)||isNaN(bm)||isNaN(bd))return null;let months=(now.getFullYear()-by)*12+(now.getMonth()-bm);if(now.getDate()<bd)months--;return months<0?0:months;}
 function assignClass(b,gkClass){if(!b)return'Unknown';const m=getAgeMonths(b);const d=new Date(b);if(EV){if(m<24)return'Nursery';if(now<new Date(d.getFullYear()+4,d.getMonth(),d.getDate()))return'Preschool';if(now<new Date(d.getFullYear()+6,d.getMonth(),d.getDate()))return'Kindergarten';if(gkClass)return gkClass;const yr=now.getFullYear()-d.getFullYear();if(yr<8)return'GK1';if(yr<10)return'GK2';return'GK3';}if(m<24)return'Nursery';const d2=new Date(b);if(now<new Date(d2.getFullYear()+4,d2.getMonth(),d2.getDate()))return'Preschool';if(now<new Date(d2.getFullYear()+6,d2.getMonth(),d2.getDate()))return'Kindergarten';if(gkClass)return gkClass;return'GK1';}
@@ -550,7 +556,7 @@ function generateReports(){
   renderProgramChart();renderClassChart();renderChildTable();
 }
 window.generateReports=generateReports;
-onValue(ref(db,'data/teachers'),snap=>{const t=snap.val()||{};Object.keys(t).forEach(k=>{if(document.activeElement.className!=='teacher-input')teachers[k]=t[k];});if(renderTimeout)clearTimeout(renderTimeout);renderTimeout=setTimeout(()=>renderDashboard(),100);});onValue(ref(db,'data/snWorkers'),snap=>{const t=snap.val()||{};Object.keys(t).forEach(k=>{if(document.activeElement.className!=='sn-input')snWorkers[k]=t[k];});if(renderTimeout)clearTimeout(renderTimeout);renderTimeout=setTimeout(()=>renderDashboard(),100);});
+onValue(ref(db,'data/sessionOverride'),snap=>{const v=snap.val();sessionOverride=(v&&v.date&&v.value)?v:null;applySession();});onValue(ref(db,'data/teachers'),snap=>{const t=snap.val()||{};Object.keys(t).forEach(k=>{if(document.activeElement.className!=='teacher-input')teachers[k]=t[k];});if(renderTimeout)clearTimeout(renderTimeout);renderTimeout=setTimeout(()=>renderDashboard(),100);});onValue(ref(db,'data/snWorkers'),snap=>{const t=snap.val()||{};Object.keys(t).forEach(k=>{if(document.activeElement.className!=='sn-input')snWorkers[k]=t[k];});if(renderTimeout)clearTimeout(renderTimeout);renderTimeout=setTimeout(()=>renderDashboard(),100);});
 
   async function importFromSheet(){
   if(!confirm('This will import all children from Google Sheets into Firebase. Continue?'))return;
