@@ -324,7 +324,7 @@ let confirmingRemoval=null,editingIdx=null,pendingCheckinIdx=null,pendingFamily=
 let lineChartInst=null,barChartInst=null,syncTimeout=null,lastEdgeState='',yellowEdgeTimer=null;
 let fbLoaded=false;let sessionResetting=false;let renderTimeout=null;
 let familyCodes={};
-function getFamilyCode(c){const fk=getFamilyKey(c).replace(/[.#$[\]|]/g,'_');const sessionKey=now.toISOString().split('T')[0]+'_'+session;const storeKey=fk+'_'+sessionKey;if(!familyCodes[storeKey]){familyCodes[storeKey]=genCode();setTimeout(()=>set(ref(db,'data/familyCodes/'+storeKey),familyCodes[storeKey]),2000);}return familyCodes[storeKey];}
+function getFamilyCode(c){const fk=getFamilyKey(c).replace(/[.#$[\]|]/g,'_');const sessionKey=now.toISOString().split('T')[0]+'_'+session;const storeKey=fk+'_'+sessionKey;if(!familyCodes[storeKey]){const used=new Set();children.forEach(x=>{if(x.checkedIn&&x.code)used.add(String(x.code));});Object.values(familyCodes).forEach(v=>used.add(String(v)));let code=genCode();let guard=0;while(used.has(code)&&guard<500){code=genCode();guard++;}familyCodes[storeKey]=code;setTimeout(()=>set(ref(db,'data/familyCodes/'+storeKey),familyCodes[storeKey]),2000);}return familyCodes[storeKey];}
 document.getElementById('today-date').textContent=now.toLocaleDateString('en-CA',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
 document.getElementById('desk-date').value=now.toISOString().split('T')[0];
 
