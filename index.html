@@ -343,9 +343,10 @@ function clsMatch(cc,cls){return cls==='Nursery'?(cc==='Nursery'||cc==='Infant'|
 function buildInactiveMap(){const map={};checkInHistory.forEach(h=>{if(!map[h.name]||h.date>map[h.name])map[h.name]=h.date;});return map;}function isInactive(child,lastCheckinMap){if(child.manualInactive)return true;if(!lastCheckinMap)lastCheckinMap=buildInactiveMap();const last=lastCheckinMap[child.name];if(!last)return false;return Math.floor((now-new Date(last))/(1000*60*60*24))>90;}
 function fullName(n){const p=n.split(', ');if(p.length<2)return n;return p.slice(1).join(' ')+' '+p[0];}
 
-var _connWatching=false;var _offTimer=null;
+var _connWatching=false;var _dbTimer=null;var _browserOff=false;var _dbDown=false;
 function setOffline(off){var b=document.getElementById('offline-banner');if(b)b.style.display=off?'block':'none';}
-function watchConnection(){if(_connWatching)return;_connWatching=true;try{onValue(ref(db,'.info/connected'),function(snap){if(snap.val()===true){if(_offTimer){clearTimeout(_offTimer);_offTimer=null;}setOffline(false);}else{if(_offTimer)clearTimeout(_offTimer);_offTimer=setTimeout(function(){setOffline(true);},2500);}});}catch(e){}try{window.addEventListener('offline',function(){setOffline(true);});}catch(e){}}
+function _updateOffline(){setOffline(_browserOff||_dbDown);}
+function watchConnection(){if(_connWatching)return;_connWatching=true;try{onValue(ref(db,'.info/connected'),function(snap){if(snap.val()===true){_dbDown=false;if(_dbTimer){clearTimeout(_dbTimer);_dbTimer=null;}_updateOffline();}else{if(_dbTimer)clearTimeout(_dbTimer);_dbTimer=setTimeout(function(){_dbDown=true;_updateOffline();},2500);}});}catch(e){}try{window.addEventListener('offline',function(){_browserOff=true;_updateOffline();});window.addEventListener('online',function(){_browserOff=false;_updateOffline();});}catch(e){}try{if(navigator&&navigator.onLine===false){_browserOff=true;_updateOffline();}}catch(e){}}
 function setSyncStatus(state,msg){const dot=document.getElementById('sync-dot');dot.className='sync-dot'+(state==='ok'?'':state==='syncing'?' syncing':' error');document.getElementById('sync-status').textContent=msg;}
 
 // ── FIREBASE SYNC ──────────────────────────────────────────────────────────
