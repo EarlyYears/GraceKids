@@ -1,0 +1,9 @@
+# NEVER commit database backups to this repo — it is PUBLIC.
+# Backup files contain children's names, birthdays, medical and allergy
+# information, parent contact details and incident reports.
+gracekids-backup-*.json
+*backup*.json
+*.bundle
+
+# macOS
+.DS_Store
