@@ -216,19 +216,22 @@ await check('a phone number is cleaned up before it is sent', () => {
 // ===========================================================================
 group('One-time guests');
 
-await check('a one-time guest is active until checked out, then archived', () => {
+await check('a one-time guest is active all day, including the evening service, then archived', () => {
   const inact = (c) => new Function('C',`
     const now=new Date(2026,8,2,10,0);
     let checkInHistory=[];
     ${grab('localDay')} ${grab('buildInactiveMap')} ${grab('isInactive')}
     return isInactive(C, buildInactiveMap());`)(c);
-  const reg = new Date(2026,8,2,9,30).getTime();
-  const beforeOut = {name:'Guest, G', oneTimeGuest:true, registeredAt:reg};
-  const afterOut  = {name:'Guest, G', oneTimeGuest:true, registeredAt:reg, coTime:new Date(2026,8,2,12,0).getTime()};
-  const ordinary  = {name:'Normal, N', registeredAt:reg, coTime:new Date(2026,8,2,12,0).getTime()};
-  if (inact(beforeOut)) return 'archived before being checked out - could not be checked in';
-  if (!inact(afterOut)) return 'still active after check-out - should be archived';
-  if (inact(ordinary))  return 'an ordinary child was archived at check-out';
+  const today = new Date(2026,8,2,9,30).getTime();
+  const lastWeek = new Date(2026,7,26,9,30).getTime();
+  const morning   = {name:'Guest, G', oneTimeGuest:true, registeredAt:today};
+  const afterAM   = {name:'Guest, G', oneTimeGuest:true, registeredAt:today, coTime:new Date(2026,8,2,12,45).getTime()};
+  const nextTime  = {name:'Guest, G', oneTimeGuest:true, registeredAt:lastWeek, coTime:lastWeek};
+  const ordinary  = {name:'Normal, N', registeredAt:lastWeek, coTime:lastWeek};
+  if (inact(morning))  return 'archived before they were even checked out';
+  if (inact(afterAM))  return 'archived after the morning service - they could not come back in the evening';
+  if (!inact(nextTime))return 'still active on a later Sunday - should be archived';
+  if (inact(ordinary)) return 'an ordinary child was archived';
   return true;
 });
 
