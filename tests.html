@@ -214,6 +214,25 @@ await check('a phone number is cleaned up before it is sent', () => {
 });
 
 // ===========================================================================
+group('One-time guests');
+
+await check('a one-time guest is active until checked out, then archived', () => {
+  const inact = (c) => new Function('C',`
+    const now=new Date(2026,8,2,10,0);
+    let checkInHistory=[];
+    ${grab('localDay')} ${grab('buildInactiveMap')} ${grab('isInactive')}
+    return isInactive(C, buildInactiveMap());`)(c);
+  const reg = new Date(2026,8,2,9,30).getTime();
+  const beforeOut = {name:'Guest, G', oneTimeGuest:true, registeredAt:reg};
+  const afterOut  = {name:'Guest, G', oneTimeGuest:true, registeredAt:reg, coTime:new Date(2026,8,2,12,0).getTime()};
+  const ordinary  = {name:'Normal, N', registeredAt:reg, coTime:new Date(2026,8,2,12,0).getTime()};
+  if (inact(beforeOut)) return 'archived before being checked out - could not be checked in';
+  if (!inact(afterOut)) return 'still active after check-out - should be archived';
+  if (inact(ordinary))  return 'an ordinary child was archived at check-out';
+  return true;
+});
+
+// ===========================================================================
 group('Who may bump a member at capacity');
 
 await check('only a child registered today, who is not a member, may bump', () => {
