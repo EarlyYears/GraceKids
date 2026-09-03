@@ -1,0 +1,266 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GraceKids — tests</title>
+<style>
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,sans-serif;
+       background:#F2F2F7;color:#1D1D1F;margin:0;padding:20px;}
+  .wrap{max-width:760px;margin:0 auto;}
+  h1{font-size:19px;margin:0 0 4px;}
+  .sub{font-size:12px;color:#6E6E73;margin-bottom:16px;}
+  #summary{font-size:15px;font-weight:700;padding:12px 14px;border-radius:10px;margin-bottom:14px;}
+  .allgood{background:#E3F5E9;color:#1D6F42;border:1px solid #1D6F42;}
+  .bad{background:#FDE8E8;color:#CC0000;border:1px solid #CC0000;}
+  .group{font-size:11px;font-weight:700;color:#6E6E73;text-transform:uppercase;
+         letter-spacing:.5px;margin:18px 0 6px;}
+  .t{background:#fff;border:0.5px solid #D1D1D6;border-radius:8px;padding:9px 11px;
+     margin-bottom:5px;font-size:13px;display:flex;gap:9px;align-items:flex-start;}
+  .t.fail{background:#FFF5F5;border-color:#CC0000;}
+  .mark{font-weight:700;flex-shrink:0;}
+  .pass .mark{color:#1D6F42;}
+  .fail .mark{color:#CC0000;}
+  .why{font-size:11px;color:#CC0000;margin-top:4px;font-family:ui-monospace,Menlo,monospace;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>GraceKids — tests</h1>
+  <div class="sub">Reads the real functions out of index.html and runs them against known inputs.
+    Uses invented children only. Green means the app's logic is behaving.</div>
+  <div id="summary">Running…</div>
+  <div id="out"></div>
+</div>
+
+<script type="module">
+const results = [];
+let currentGroup = '';
+function group(name){ currentGroup = name; }
+async function check(name, fn){
+  try {
+    const why = await fn();
+    results.push({group:currentGroup, name, pass: why === true || why === undefined, why: why === true ? '' : why});
+  } catch (e) {
+    results.push({group:currentGroup, name, pass:false, why:'threw: ' + (e && e.message ? e.message : e)});
+  }
+}
+
+// ---- pull the real functions out of the app -------------------------------
+const src = await (await fetch('index.html?cb=' + Date.now())).text();
+
+function grab(name){
+  for (const prefix of ['async function ', 'function ']) {
+    const start = src.indexOf(prefix + name + '(');
+    if (start < 0) continue;
+    let i = src.indexOf('{', start), depth = 0;
+    for (let j = i; j < src.length; j++) {
+      if (src[j] === '{') depth++;
+      else if (src[j] === '}') { depth--; if (depth === 0) return src.slice(start, j + 1); }
+    }
+  }
+  throw new Error('function ' + name + ' not found in index.html');
+}
+const AsyncFn = Object.getPrototypeOf(async function(){}).constructor;
+
+// ===========================================================================
+group('Dates and class assignment');
+
+await check('a child moves up a class on their birthday, not the day before', () => {
+  const cls = (bday, today) => new Function('B','T',`
+    const now=new Date(T); const EV=false;
+    ${grab('getAgeMonths')} ${grab('bdayDate')} ${grab('assignClass')}
+    return assignClass(B,'');`)(bday, today);
+  const b = '2020-09-02';
+  const before = cls(b, new Date(2026,8,1,10,0).getTime());
+  const on     = cls(b, new Date(2026,8,2,10,0).getTime());
+  if (before !== 'Kindergarten') return 'day before 6th birthday gave ' + before + ', expected Kindergarten';
+  if (on !== 'GraceKids 1')      return 'on 6th birthday gave ' + on + ', expected GraceKids 1';
+  return true;
+});
+
+await check('a child under two is in Nursery', () => {
+  const cls = new Function(`
+    const now=new Date(2026,8,2); const EV=false;
+    ${grab('getAgeMonths')} ${grab('bdayDate')} ${grab('assignClass')}
+    return assignClass('2025-06-01','');`)();
+  return cls === 'Nursery' ? true : 'got ' + cls;
+});
+
+await check('the date is worked out locally, so a late evening stays on the same day', () => {
+  const f = new Function(`${grab('localDay')} return localDay;`)();
+  const summer = f(new Date(2026,7,30,20,5));   // 8:05pm, after UTC rolls over
+  const winter = f(new Date(2026,0,11,19,5));   // 7:05pm in winter
+  if (summer !== '2026-08-30') return 'summer 20:05 gave ' + summer;
+  if (winter !== '2026-01-11') return 'winter 19:05 gave ' + winter;
+  return true;
+});
+
+// ===========================================================================
+group('The evening service is not reset underneath you');
+
+const stale = (nowLocal, checkedInAt) => new Function('NOW','CI',`
+  const now=new Date(NOW);
+  const timeVal=now.getHours()*60+now.getMinutes();
+  const autoSession=(timeVal>=8*60&&timeVal<14*60)?'morning':'evening';
+  let children=[{name:'Test, Child', checkedIn:true, ciTime:CI}];
+  ${grab('localDay')} ${grab('sessionForTime')} ${grab('staleCheckins')}
+  return staleCheckins().length>0;`)(nowLocal.getTime(), checkedInAt.getTime());
+
+await check('a child checked in at 4pm is not flagged at 7:05pm in winter', () =>
+  stale(new Date(2026,0,11,19,5), new Date(2026,0,11,16,0)) ? 'flagged - the evening service would be auto-reset' : true);
+
+await check('a child checked in at 4pm is not flagged at 8:05pm in summer', () =>
+  stale(new Date(2026,7,30,20,5), new Date(2026,7,30,16,0)) ? 'flagged - the evening service would be auto-reset' : true);
+
+await check("yesterday's check-in is still flagged as stale", () =>
+  stale(new Date(2026,7,30,10,0), new Date(2026,7,29,16,0)) ? true : 'not flagged - genuinely stale sessions would never clear');
+
+// ===========================================================================
+group('Check-in and check-out');
+
+await check('cancelling a family check-in leaves a sibling who was already in', () => {
+  const out = new Function(`
+    let previewMode='checkin';
+    let children=[{name:'Fam, Ada',checkedIn:true,cl:{OLD:1},placementCls:'Room 3'},
+                  {name:'Fam, Ben',checkedIn:true,cl:{NEW:1},placementCls:'Room 5'}];
+    let pendingFamily=[children[0],children[1]], pendingFamilyCode='1234';
+    let pendingFamilyWasIn=new Set(['Fam, Ada']);
+    let pendingCheckinIdx=null;
+    const synced=[]; const mkCL=()=>({}); const syncOneChild=(c)=>synced.push(c.name);
+    const renderList=()=>{}, renderDashboard=()=>{}, showUndo=()=>{}, closeAllModals=()=>{}, focusSearch=()=>{};
+    const document={getElementById:()=>({style:{},value:'',focus(){},querySelector:()=>null})};
+    ${grab('cancelCheckin')}
+    try{ cancelCheckin(); }catch(e){}
+    return {ada:children[0], ben:children[1], synced};`)();
+  if (out.ada.checkedIn !== true)  return 'Ada was checked out - she was already in before this family check-in';
+  if (out.ada.placementCls !== 'Room 3') return "Ada's room was cleared";
+  if (out.ben.checkedIn !== false) return 'Ben was not reverted';
+  if (out.synced.join() !== 'Fam, Ben') return 'wrote to Firebase for: ' + out.synced.join(', ');
+  return true;
+});
+
+await check('a security code stored as a number still matches', () => {
+  const match = new Function('KIDS','TYPED',`
+    const children=KIDS; ${grab('childrenWithCode')}
+    return childrenWithCode(TYPED).map(c=>c.name);`);
+  const roster = [
+    {name:'AsText, A',   checkedIn:true,  code:'4827'},
+    {name:'AsNumber, B', checkedIn:true,  code:4827},
+    {name:'Padded, C',   checkedIn:true,  code:' 4827 '},
+    {name:'NotIn, D',    checkedIn:false, code:'4827'},
+    {name:'Other, E',    checkedIn:true,  code:'1111'}
+  ];
+  const got = match(roster, '4827').sort().join(', ');
+  const want = 'AsNumber, B, AsText, A, Padded, C';
+  return got === want ? true : 'got ' + got;
+});
+
+await check('a code lookup ignores children who are not checked in, and other families', () => {
+  const match = new Function('KIDS',`
+    const children=KIDS; ${grab('childrenWithCode')}
+    return childrenWithCode('4827').map(c=>c.name);`);
+  const got = match([
+    {name:'In, A',    checkedIn:true,  code:'4827'},
+    {name:'NotIn, B', checkedIn:false, code:'4827'},
+    {name:'Other, C', checkedIn:true,  code:'9999'}
+  ]);
+  return got.join() === 'In, A' ? true : 'got ' + got.join(', ');
+});
+
+
+// ===========================================================================
+group('What gets written down');
+
+await check('a check-out records the time and the code that was presented', async () => {
+  const box = document.createElement('div'); box.id = 'tbox'; document.body.appendChild(box);
+  const run = await new AsyncFn('BOX',`
+    let pendingCheckoutCode='4827', pendingCheckoutNames=null;
+    let children=[{name:'Fam, Ada',checkedIn:true,code:'4827'},
+                  {name:'Fam, Ben',checkedIn:true,code:'4827'}];
+    const mkCL=()=>({}), fullName=n=>n;
+    ${grab('escHtml')}
+    const closeAllModals=()=>{}, focusSearch=()=>{}, renderList=()=>{}, renderDashboard=()=>{};
+    const syncOneChild=async()=>{}; const alert=()=>{};
+    ${grab('checkoutRowHTML')} ${grab('confirmFamilyCheckout')}
+    pendingCheckoutNames=children.map(c=>c.name);
+    BOX.innerHTML=children.map((c,i)=>checkoutRowHTML(c,i,'co-fam',false)).join('');
+    BOX.querySelector('#co-fam-1').checked=false;      // Ben stays in
+    await confirmFamilyCheckout();
+    return children.map(c=>({n:c.name,out:!c.checkedIn,time:!!c.coTime,code:c.coCode||null}));`)(box);
+  box.remove();
+  const ada = run[0], ben = run[1];
+  if (!ada.out)            return 'Ada was not checked out';
+  if (!ada.time)           return 'no check-out time recorded for Ada';
+  if (ada.code !== '4827') return 'code recorded as ' + ada.code + ', expected 4827';
+  if (ben.out)             return 'Ben was checked out despite being unticked';
+  if (ben.time)            return 'Ben got a check-out time despite staying in';
+  return true;
+});
+
+await check('a medical note containing "<" is not swallowed', () => {
+  const esc = new Function(`${grab('escHtml')} return escHtml;`)();
+  const note = 'Give <half a tablet with food';
+  const d = document.createElement('div');
+  d.innerHTML = '<div>' + esc(note) + '</div>';
+  return d.textContent === note ? true : 'displayed as: "' + d.textContent + '"';
+});
+
+await check('a phone number is cleaned up before it is sent', () => {
+  const n = new Function(`${grab('normPhone')} return normPhone;`)();
+  const forms = ['2892187488','(289) 218-7488','289-218-7488','+1 289 218 7488','289 218 7488'];
+  const bad = forms.filter(f => n(f) !== '2892187488');
+  return bad.length ? 'these did not normalise: ' + bad.join(' | ') : true;
+});
+
+// ===========================================================================
+group('Who may bump a member at capacity');
+
+await check('only a child registered today, who is not a member, may bump', () => {
+  const NOW = new Date(2026,8,2,10,0), DAY = 86400000;
+  const can = (c) => new Function('C','N',`
+    const now=new Date(N); ${grab('localDay')} ${grab('canBump')} return canBump(C);`)(c, NOW.getTime());
+  const cases = [
+    ['member registered today',      {member:true,  registeredAt:NOW.getTime()},        false],
+    ['visitor already in registry',  {member:false, registeredAt:NOW.getTime()-7*DAY},  false],
+    ['existing record, no stamp',    {member:false},                                    false],
+    ['registered today at the desk', {member:false, registeredAt:NOW.getTime()},        true ]
+  ];
+  const wrong = cases.filter(([,c,want]) => can(c) !== want).map(([l]) => l);
+  return wrong.length ? 'wrong for: ' + wrong.join('; ') : true;
+});
+
+// ===========================================================================
+// render
+const out = document.getElementById('out');
+let lastGroup = null, failed = 0;
+for (const r of results) {
+  if (r.group !== lastGroup) {
+    lastGroup = r.group;
+    const g = document.createElement('div');
+    g.className = 'group'; g.textContent = r.group;
+    out.appendChild(g);
+  }
+  if (!r.pass) failed++;
+  const d = document.createElement('div');
+  d.className = 't ' + (r.pass ? 'pass' : 'fail');
+  const m = document.createElement('span');
+  m.className = 'mark'; m.textContent = r.pass ? '✓' : '✗';
+  const body = document.createElement('div');
+  body.textContent = r.name;
+  if (!r.pass && r.why) {
+    const w = document.createElement('div');
+    w.className = 'why'; w.textContent = r.why;
+    body.appendChild(w);
+  }
+  d.appendChild(m); d.appendChild(body);
+  out.appendChild(d);
+}
+const sum = document.getElementById('summary');
+sum.className = failed ? 'bad' : 'allgood';
+sum.textContent = failed
+  ? failed + ' of ' + results.length + ' checks FAILED — see below'
+  : 'All ' + results.length + ' checks passed';
+</script>
+</body>
+</html>

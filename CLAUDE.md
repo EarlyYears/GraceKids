@@ -6,8 +6,9 @@ cannot check children in or out on a Sunday morning.
 
 ## Shape of the project
 
-Single-file app. Everything is `index.html` (~187KB, ~660 lines of very long
+Single-file app. Everything is `index.html` (~203KB, ~655 lines of very long
 lines). There is no build step, no bundler, no `package.json`, no Node.
+`tests.html` sits beside it — see Tests below.
 
 - Lines 1–8: head
 - Lines 9–172: `<style>`
@@ -36,6 +37,7 @@ string, not by reading line ranges.** Reading the whole file will flood context.
     data/teachers      — per-class teacher counts
     data/snWorkers     — special-needs / One-to-One workers
     data/deskNotes/    — notes left at the desk, written per-note
+    data/messageLog/   — one record per text sent, pruned after 60 days
 
 ## Tabs
 
@@ -64,6 +66,19 @@ string, not by reading line ranges.** Reading the whole file will flood context.
   focus returns to the search box so volunteers can keep typing. `afterprint` is
   used because the print dialog steals focus.
 - **Printing** produces child tags; there is a `testPrint` path.
+- **Identify children by name, never by list position.** Rows and dialogs used
+  to embed `children.indexOf(c)` in handlers, but the sync listener rebuilds and
+  re-sorts `children` on every change, so those positions go stale. That
+  released the wrong children, printed the wrong tags and overwrote the wrong
+  registration records. Handlers take a name and resolve it when clicked.
+- **Dates must be worked out locally, never from `toISOString()`.** That returns
+  UTC, which is a day ahead here from 20:00 in summer and 19:00 in winter. It
+  caused every child to be auto-checked-out mid evening service. Use `localDay()`.
+- **Escape anything a person typed** with `escHtml` before putting it on screen.
+  A medical note reading "Give <half a tablet" is otherwise swallowed whole.
+- **Every check-out goes through the same confirmation pop-up**, one child or
+  five, and that path is what records `coTime`/`coVia`/`coCode`. Do not add a
+  shortcut that skips it — the last one silently stopped recording check-outs.
 
 ## Deploying
 
@@ -96,6 +111,22 @@ updated.
 Then open http://localhost:8000. Note this connects to the **live** Firebase
 database — there is no separate dev database, so any data you create or change
 while testing is real.
+
+## Tests
+
+`tests.html` reads the real functions out of `index.html` and runs them against
+known inputs, using invented children. Open it in a browser:
+
+    python3 -m http.server 8000     # then http://localhost:8000/tests.html
+
+It also deploys with the app, so https://earlyyears.github.io/GraceKids/tests.html
+checks whatever version is actually live.
+
+**Run it before every deploy.** It covers the things that have actually broken:
+the birthday/class boundary, local dates, the evening-service auto-reset,
+cancelling a family check-in, code matching, check-out recording, escaping,
+phone normalisation and who may bump at capacity. Add a test whenever you fix a
+bug — that is what stops it coming back.
 
 ## Commit style
 
