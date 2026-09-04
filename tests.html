@@ -327,6 +327,21 @@ await check('only a child registered today, who is not a member, may bump', () =
 });
 
 // ===========================================================================
+group('Bulk check-out is limited to Jr Youth');
+
+await check('only Jr Youth offers a check-out-all button', () => {
+  const can = (cls) => new Function('CLS', `
+    ${grab('canBulkCheckout')} return canBulkCheckout(CLS);`)(cls);
+  const morning = ['Nursery','Preschool','Kindergarten','GraceKids 1',
+                   'GraceKids 2A','GraceKids 2B','Jr Youth'];
+  const other   = ['One-to-One', '', null, undefined, 'jr youth', 'Jr  Youth'];
+  const wrong = [];
+  morning.forEach(c => { if (can(c) !== (c === 'Jr Youth')) wrong.push(c); });
+  other.forEach(c => { if (can(c)) wrong.push(String(c)); });
+  return wrong.length ? 'wrong for: ' + wrong.join('; ') : true;
+});
+
+// ===========================================================================
 // render
 const out = document.getElementById('out');
 let lastGroup = null, failed = 0;
