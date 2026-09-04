@@ -342,6 +342,32 @@ await check('only Jr Youth offers a check-out-all button', () => {
 });
 
 // ===========================================================================
+group('Teacher counts belong to one service');
+
+await check('changing service, or opening on a new day, clears the counts', () => {
+  const mark = (dayMs, sess) => new Function('D','S', `
+    const now=new Date(D), session=S; ${grab('localDay')} ${grab('workerCountsMark')}
+    return workerCountsMark();`)(dayMs, sess);
+  const SUN = new Date(2026,8,6,10,0).getTime();      // Sunday morning
+  const SUNPM = new Date(2026,8,6,16,0).getTime();    // same Sunday, evening
+  const NEXT = new Date(2026,8,13,10,0).getTime();    // the following Sunday
+
+  const cases = [
+    ['same service, same day',   mark(SUN,'morning'),   mark(SUN,'morning'),   true ],
+    ['morning then evening',     mark(SUN,'morning'),   mark(SUNPM,'evening'), false],
+    ['same service, next week',  mark(SUN,'morning'),   mark(NEXT,'morning'),  false]
+  ];
+  const wrong = cases.filter(([,a,b,same]) => (a===b) !== same).map(([l]) => l);
+  if (wrong.length) return 'wrong for: ' + wrong.join('; ');
+
+  // and the counts themselves actually go to zero
+  const t = {Nursery:3, Preschool:2}, sw = {Nursery:1};
+  new Function('T','S', `${grab('resetWorkerCounts')} resetWorkerCounts(T,S);`)(t, sw);
+  const left = [...Object.values(t), ...Object.values(sw)].filter(v => v !== 0);
+  return left.length ? 'a count survived the reset' : true;
+});
+
+// ===========================================================================
 // render
 const out = document.getElementById('out');
 let lastGroup = null, failed = 0;
