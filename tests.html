@@ -265,12 +265,12 @@ await check('delivery status is looked up, and only for messages still unresolve
     const update=async(p,u)=>{ written.push(u); };
     const fetch=async(url,opts)=>{
       asked.push(JSON.parse(opts.body).check);
-      return {json:async()=>({success:true, checked:[
+      return {status:200, text:async()=>JSON.stringify({success:true, checked:[
         {sid:'SMaaa', status:'delivered', error:''},
         {sid:'SMbbb', status:'undelivered', error:'Unreachable destination handset'}
       ]})};
     };
-    var msgChecking=false; var MSG_ENDPOINT='x';
+    var msgChecking=false; var msgCheckNote=''; var MSG_ENDPOINT='x';
     ${grab('refreshDeliveryStatus')}
     const n = await refreshDeliveryStatus();
     return {n, asked, written};
