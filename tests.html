@@ -214,6 +214,38 @@ await check('a phone number is cleaned up before it is sent', () => {
 });
 
 // ===========================================================================
+group('What the desk is told about a text');
+
+await check("Twilio's real status is recorded, and queued is not called delivered", () => {
+  window.__w = [];
+  const run = (twStatus, err) => new Function('ST','ERR',`
+    let textCtxChild='Test, Child';
+    const auth={currentUser:{email:'desk@example.com'}};
+    const db={}; const ref=(d,p)=>p;
+    const set=(p,rec)=>{ __w.push(rec); return Promise.resolve(); };
+    ${grab('normPhone')}
+    ${grab('logTextSends')}
+    const data = ST===null ? null : {results:[{phone:'2892187488', status:ST, error:ERR||undefined}]};
+    logTextSends(['2892187488'],'hello',data,{});
+    return __w[__w.length-1];
+  `)(twStatus, err);
+
+  const queued    = run('queued');
+  const delivered = run('delivered');
+  const undel     = run('undelivered');
+  const errored   = run('error','invalid recipient');
+  const noAnswer  = run(null);
+
+  if (queued.status !== 'accepted')      return 'queued was recorded as "' + queued.status + '" - it must not count as delivered';
+  if (queued.twilio !== 'queued')        return "Twilio's own word was not kept, got " + queued.twilio;
+  if (delivered.status !== 'delivered')  return 'delivered was recorded as ' + delivered.status;
+  if (undel.status !== 'failed')         return 'undelivered was recorded as ' + undel.status;
+  if (errored.status !== 'failed')       return 'an error was recorded as ' + errored.status;
+  if (noAnswer.status !== 'unconfirmed') return 'no response was recorded as ' + noAnswer.status;
+  return true;
+});
+
+// ===========================================================================
 group('One-time guests');
 
 await check('a one-time guest is active all day, including the evening service, then archived', () => {
