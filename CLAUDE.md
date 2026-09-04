@@ -59,6 +59,10 @@ string, not by reading line ranges.** Reading the whole file will flood context.
 - **Offline handling** is real and load-bearing. There is a `dirtyWrites` queue
   with retry, an offline banner driven by *two* signals (Firebase
   `.info/connected` and the browser offline event), and a sync status indicator.
+- **The app always opens on the dashboard.** That is deliberate, and it applies
+  to the auto-update reload too - a desk that reloads mid-session lands back on
+  the dashboard on purpose. Do not add "remember the last tab"; it has been
+  suggested and declined.
 - **Auto-reload on new build** — desks poll `index.html` and reload when a new
   build deploys, but only when idle. Uses a ranged GET (HEAD returned
   intermittent 503s from Pages).
