@@ -246,6 +246,48 @@ await check("Twilio's real status is recorded, and queued is not called delivere
 });
 
 // ===========================================================================
+group('Did the text actually arrive?');
+
+await check('delivery status is looked up, and only for messages still unresolved', async () => {
+  const T = Date.now();
+  const AsyncFn = Object.getPrototypeOf(async function(){}).constructor;
+  const store = {
+    q1:{ts:T-600000, sid:'SMaaa', status:'accepted', twilio:'queued'},
+    q2:{ts:T-900000, sid:'SMbbb', status:'accepted', twilio:'queued'},
+    done:{ts:T-800000, sid:'SMccc', status:'delivered', twilio:'delivered'},
+    nosid:{ts:T-700000, status:'accepted', twilio:'queued'},
+    old:{ts:T-5*86400000, sid:'SMddd', status:'accepted', twilio:'queued'}
+  };
+  const out = await new AsyncFn('STORE',`
+    const asked=[]; const written=[];
+    const db={}; const ref=(d,p)=>p;
+    const get=async()=>({val:()=>STORE});
+    const update=async(p,u)=>{ written.push(u); };
+    const fetch=async(url,opts)=>{
+      asked.push(JSON.parse(opts.body).check);
+      return {json:async()=>({success:true, checked:[
+        {sid:'SMaaa', status:'delivered', error:''},
+        {sid:'SMbbb', status:'undelivered', error:'Unreachable destination handset'}
+      ]})};
+    };
+    var msgChecking=false; var MSG_ENDPOINT='x';
+    ${grab('refreshDeliveryStatus')}
+    const n = await refreshDeliveryStatus();
+    return {n, asked, written};
+  `)(store);
+
+  const asked = out.asked[0] || [];
+  if (asked.includes('SMccc')) return 'asked about a message already known to be delivered';
+  if (asked.includes('SMddd')) return 'asked about a message older than the lookup window';
+  if (asked.length !== 2)      return 'asked about ' + asked.length + ' messages, expected 2';
+  const w = out.written[0] || {};
+  if (w['q1/status'] !== 'delivered') return 'a delivered message was recorded as ' + w['q1/status'];
+  if (w['q2/status'] !== 'failed')    return 'an undelivered message was recorded as ' + w['q2/status'];
+  if (!w['q2/error'])                 return "the carrier's reason was not kept";
+  return true;
+});
+
+// ===========================================================================
 group('One-time guests');
 
 await check('a one-time guest is active all day, including the evening service, then archived', () => {
