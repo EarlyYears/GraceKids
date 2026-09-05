@@ -495,6 +495,35 @@ await check('a box ticked on a reprint is recorded against that child', () => {
 });
 
 // ===========================================================================
+group('A child marked ill is not checked in');
+
+await check('only children arriving with Ill ticked are stopped', () => {
+  const ill = (arrivals) => new Function('A', `${grab('illArrivals')} return illArrivals(A);`)(arrivals);
+  const kid = (name, isIll) => ({name, cl:{ill:!!isIll, noSnack:false}});
+  const cases = [
+    ['nobody ill',            [kid('A, One'), kid('B, Two')],                 []],
+    ['one sibling ill',       [kid('A, One', true), kid('B, Two')],           ['A, One']],
+    ['both ill',              [kid('A, One', true), kid('B, Two', true)],     ['A, One','B, Two']],
+    ['no care list at all',   [{name:'C, Three'}],                            []],
+    ['nobody arriving',       [],                                             []]
+  ];
+  const wrong = cases.filter(([,a,want]) => JSON.stringify(ill(a)) !== JSON.stringify(want)).map(([l]) => l);
+  return wrong.length ? 'wrong for: ' + wrong.join('; ') : true;
+});
+
+await check('the message names the child and says how to undo it', () => {
+  const msg = (names) => new Function('N', `
+    function fullName(n){var p=String(n).split(", ");return (p[1]||"")+" "+(p[0]||"");}
+    ${grab('illMessage')} return illMessage(N);`)(names);
+  const one = msg(['Brannagh, Ellis']);
+  const two = msg(['Brannagh, Ellis','Brannagh, Elliot']);
+  if (!one.includes('Ellis Brannagh is marked ill')) return 'one child reads wrong: ' + one;
+  if (!two.includes('Ellis Brannagh and Elliot Brannagh are marked ill')) return 'two children read wrong: ' + two;
+  if (!one.includes('untick')) return 'does not say how to undo it';
+  return true;
+});
+
+// ===========================================================================
 // render
 const out = document.getElementById('out');
 let lastGroup = null, failed = 0;
