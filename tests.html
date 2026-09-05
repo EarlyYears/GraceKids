@@ -368,6 +368,58 @@ await check('changing service, or opening on a new day, clears the counts', () =
 });
 
 // ===========================================================================
+group('Sending: a failure is never called a success');
+
+await check('an incident is only cleared when the email service confirmed it', () => {
+  const verdict = (sum) => new Function('S', `${grab('sendVerdict')} return sendVerdict(S);`)(sum);
+  const cases = [
+    ['service unreachable / no reply', null,                              'unconfirmed'],
+    ['all recipients accepted',        {ok:['a@x.com','b@x.com'], bad:[]}, 'sent'],
+    ['one recipient failed',           {ok:['a@x.com'], bad:['b@x.com']},  'partial']
+  ];
+  const wrong = cases.filter(([,s,want]) => verdict(s) !== want).map(([l]) => l);
+  return wrong.length ? 'wrong for: ' + wrong.join('; ') : true;
+});
+
+// ===========================================================================
+group('Desks agree with each other');
+
+await check('clearing the teacher counts reaches a desk that did not do the clearing', () => {
+  const apply = (local, snap) => new Function('L','T', `
+    const isEditingCounter = () => false; ${grab('applyCounterSnapshot')}
+    applyCounterSnapshot(L, T, 'teacher-input'); return L;`)(local, snap);
+  const a = apply({Nursery:3, Preschool:2}, {});             // node emptied
+  const b = apply({Nursery:3, Preschool:2}, {Nursery:1});    // one class re-entered
+  if (a.Nursery !== 0 || a.Preschool !== 0) return 'an emptied node left ' + JSON.stringify(a);
+  if (b.Nursery !== 1 || b.Preschool !== 0) return 'a partial node left ' + JSON.stringify(b);
+  return true;
+});
+
+await check('an old unsent change is not replayed over a newer one', () => {
+  const stale = (cur, ts) => new Function('C','T', `${grab('replayIsStale')} return replayIsStale(C,T);`)(cur, ts);
+  const T = 1_000_000;
+  const cases = [
+    ['database has something newer',   {updatedAt: T + 5000}, T, true ],
+    ['database has something older',   {updatedAt: T - 5000}, T, false],
+    ['record has no stamp yet',        {name:'x'},            T, false],
+    ['nothing there at all',           null,                  T, false]
+  ];
+  const wrong = cases.filter(([,c,t,want]) => stale(c,t) !== want).map(([l]) => l);
+  return wrong.length ? 'wrong for: ' + wrong.join('; ') : true;
+});
+
+// ===========================================================================
+group('The pickup slip');
+
+await check('the family letters on the slip come from the name, on reprint too', () => {
+  const label = (n, c) => new Function('N','C', `${grab('familySlipLabel')} return familySlipLabel(N,C);`)(n, c);
+  if (label('Brannagh, Ellis', 2) !== 'BRA-2') return 'got ' + label('Brannagh, Ellis', 2);
+  if (label('Li, Ann', 1) !== 'LI-1') return 'short surname: ' + label('Li, Ann', 1);
+  if (label(undefined, 3) !== '-3') return 'missing name should degrade, got ' + label(undefined, 3);
+  return true;
+});
+
+// ===========================================================================
 // render
 const out = document.getElementById('out');
 let lastGroup = null, failed = 0;

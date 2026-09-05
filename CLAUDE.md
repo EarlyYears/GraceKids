@@ -19,6 +19,14 @@ lines). There is no build step, no bundler, no `package.json`, no Node.
 Because lines are extremely long, **navigate by `grep -n` for a function or
 string, not by reading line ranges.** Reading the whole file will flood context.
 
+When inserting code in front of a function, anchor on `async function name(`
+where the function is async - anchoring on `function name(` alone lands the
+insertion between `async` and `function`, which silently moves the `async`
+onto the new code and turns the old function's `await` into a syntax error
+that breaks the whole app. This has happened more than once. After any edit,
+load the page and read the console: the sign-in screen is static HTML and
+appears even when the module failed to parse, so it proves nothing.
+
 ## Stack
 
 - Firebase 10.12.0 modular SDK (`firebase-app`, `firebase-auth`,
