@@ -460,6 +460,41 @@ await check('the check only bites where it should', () => {
 });
 
 // ===========================================================================
+group('The care-list boxes reach the tag');
+
+await check('Ill in last 48hrs is printed, like the other flags', () => {
+  const src2 = src;
+  const tag = src2.slice(src2.indexOf('function buildPrintHTMLv2('));
+  const body = tag.slice(0, tag.indexOf('const digits='));
+  const missing = [];
+  [['ill','ILL IN LAST 48HRS'], ['noSnack','No Snack'], ['noChange','Do NOT Change'],
+   ['noSit','Does Not Sit'], ['potty','Potty Training']].forEach(([f,label]) => {
+    if (!body.includes('cl.' + f)) missing.push(f + ' is never read');
+    else if (!body.includes(label)) missing.push(f + ' has no label on the tag');
+  });
+  if (!body.includes('hasX=cl.ill')) missing.push('ill does not open the flags block');
+  return missing.length ? missing.join('; ') : true;
+});
+
+await check('a box ticked on a reprint is recorded against that child', () => {
+  const run = new Function(`
+    let pendingFamily = null, pendingReprintCL = {};
+    ${grab('famSetCheck')}
+    famSetCheck(0,'ill',true); famSetCheck(1,'noSnack',true); famSetCheck(0,'cup',true);
+    const duringReprint = JSON.stringify(pendingReprintCL);
+    // and during a normal check-in it still writes straight to the family
+    pendingFamily = [{cl:{ill:false}}]; pendingReprintCL = {};
+    famSetCheck(0,'ill',true);
+    return {duringReprint, checkin: pendingFamily[0].cl.ill, untouched: JSON.stringify(pendingReprintCL)};
+  `)();
+  if (run.duringReprint !== '{"0":{"ill":true,"cup":true},"1":{"noSnack":true}}')
+    return 'reprint edits recorded wrongly: ' + run.duringReprint;
+  if (run.checkin !== true) return 'check-in path stopped working';
+  if (run.untouched !== '{}') return 'check-in wrote into the reprint store too';
+  return true;
+});
+
+// ===========================================================================
 // render
 const out = document.getElementById('out');
 let lastGroup = null, failed = 0;
