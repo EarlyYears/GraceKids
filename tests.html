@@ -420,6 +420,46 @@ await check('the family letters on the slip come from the name, on reprint too',
 });
 
 // ===========================================================================
+group('A family cannot slip past the ratio together');
+
+await check('siblings are counted together, not one at a time', () => {
+  const RAT = {Nursery:3, Preschool:4};
+  const over = (arrivals, roster, teachers) => new Function('A','R','T','RAT', `
+    ${grab('capacityCheck')} return capacityCheck(A,R,T,RAT);`)(arrivals, roster, teachers, RAT);
+
+  const kid = (name, cls, checkedIn) => ({name, cls, checkedIn: !!checkedIn, sn:false});
+  // one teacher in Nursery = room for 3. Two already in, so one space left.
+  const roster = [kid('X, A','Nursery',true), kid('X, B','Nursery',true)];
+  const one    = [kid('Y, One','Nursery')];
+  const two    = [kid('Y, One','Nursery'), kid('Y, Two','Nursery')];
+  const T = {Nursery:1};
+
+  if (over(one, roster.concat(one), T).length) return 'one child fitting was blocked';
+  const r = over(two, roster.concat(two), T);
+  if (r.length !== 1) return 'two siblings into one space were not caught';
+  if (r[0].room !== 1 || r[0].over !== 1) return 'wrong arithmetic: ' + JSON.stringify(r[0]);
+  return true;
+});
+
+await check('the check only bites where it should', () => {
+  const RAT = {Nursery:3, Preschool:4};
+  const over = (arrivals, roster, teachers) => new Function('A','R','T','RAT', `
+    ${grab('capacityCheck')} return capacityCheck(A,R,T,RAT);`)(arrivals, roster, teachers, RAT);
+  const kid = (name, cls, extra) => Object.assign({name, cls, checkedIn:false, sn:false}, extra||{});
+
+  const full = [kid('a,1','Nursery'), kid('a,2','Nursery'), kid('a,3','Nursery'), kid('a,4','Nursery')];
+  const cases = [
+    ['no teacher set means no cap enforced', full, [], {Nursery:0}, 0],
+    ['a class with no ratio is ignored',     [kid('b,1','Jr Youth')], [], {'Jr Youth':1}, 0],
+    ['one-to-one children are not counted',  [kid('c,1','Nursery',{sn:true})], [], {Nursery:1}, 0],
+    ['siblings split across classes',        [kid('d,1','Nursery'), kid('d,2','Preschool')], [], {Nursery:1,Preschool:1}, 0],
+    ['four into a three-child room',         full, full, {Nursery:1}, 1]
+  ];
+  const wrong = cases.filter(([,a,r,t,want]) => over(a,r,t).length !== want).map(([l]) => l);
+  return wrong.length ? 'wrong for: ' + wrong.join('; ') : true;
+});
+
+// ===========================================================================
 // render
 const out = document.getElementById('out');
 let lastGroup = null, failed = 0;
