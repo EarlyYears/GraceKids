@@ -664,6 +664,37 @@ await check('registering a second child of the same name never overwrites the fi
 });
 
 // ===========================================================================
+group('Emptying the registration form');
+
+await check('every field on the form is actually cleared', () => {
+  const clearer = grab('clearRegistrationForm');
+  const markup = src.slice(0, src.indexOf('<script type="module">'));
+  const fields = [...new Set([...markup.matchAll(/<input[^>]*id="(reg-[a-z0-9-]+)"/g)].map(m => m[1]))];
+  if (fields.length < 9) return 'only found ' + fields.length + ' fields - the check is not looking properly';
+  const missed = fields.filter(f => !clearer.includes("'" + f + "'"));
+  if (missed.length) return 'not cleared: ' + missed.join(', ');
+  // the child cards are wiped as a block rather than field by field
+  if (!clearer.includes('resetRegChildren()')) return 'the child cards are not reset';
+  return true;
+});
+
+await check('the form is emptied on Cancel but not before a successful save', () => {
+  const fn = grab('registerChild');
+  const cancel = fn.indexOf('clearRegistrationForm();return;');
+  const dup = fn.indexOf('duplicateWarning');
+  const created = fn.indexOf('const created=[]');
+  if (cancel < 0) return 'Cancel does not empty the form';
+  if (!(dup < cancel && cancel < created)) return 'the form is emptied at the wrong point';
+  // and nothing is written to the database before that point
+  const beforeCancel = fn.slice(0, cancel);
+  if (/syncOneChild\(|set\(ref\(/.test(beforeCancel)) return 'a child is saved before the warning is answered';
+  // saying yes must not empty it on the way through
+  const between = fn.slice(cancel + 'clearRegistrationForm();return;'.length, created);
+  if (between.includes('clearRegistrationForm()')) return 'saying yes also empties the form';
+  return true;
+});
+
+// ===========================================================================
 // render
 const out = document.getElementById('out');
 let lastGroup = null, failed = 0;
