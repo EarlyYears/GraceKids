@@ -597,6 +597,73 @@ await check('the two parents of one child stay two separate texts', () => {
 });
 
 // ===========================================================================
+group('Registering someone already on file');
+
+await check('near-misses are caught, genuinely different children are not', () => {
+  const m = (a,b) => new Function('A','B', `
+    ${grab('nameKey')} ${grab('nameTokens')} ${grab('nameMatches')} return nameMatches(A,B);`)(a,b);
+  const shouldMatch = [
+    ['Brannagh, Ellis', 'Brannagh, Ellis'],
+    ['Brannagh, Ellis', 'brannagh,  ellis'],        // spacing and case
+    ['Brannagh, Ellis', 'Ellis Brannagh'],          // typed the other way round
+    ["O'Brien, Mary",   'OBrien, Mary'],            // punctuation
+    ["O\u2019Brien, Mary", "O'Brien, Mary"],          // curly vs straight apostrophe
+    ['Smith-Jones, Amy','Smith Jones, Amy'],         // hyphen
+    ['Nunez, Jose',     'Núñez, José'],             // accents
+    ['Brannagh, Ellis', 'Brannagh, Ellis James']    // a middle name was on file
+  ];
+  const shouldNot = [
+    ['Brannagh, Ellis', 'Brannagh, Elliot'],
+    ['Brannagh, Ellis', 'Vantongeren, Ella'],
+    ['Brannagh, Ellis', ''],
+    ['Li, Ann',         'Li, Ben']
+  ];
+  const bad = [];
+  shouldMatch.forEach(([a,b]) => { if (!m(a,b)) bad.push('missed: ' + a + ' vs ' + b); });
+  shouldNot.forEach(([a,b]) => { if (m(a,b)) bad.push('false alarm: ' + a + ' vs ' + b); });
+  return bad.length ? bad.join('; ') : true;
+});
+
+await check('the warning says where the existing record is', () => {
+  const NOW = new Date(2026,8,6,10,0).getTime(), DAY = 86400000;
+  const st = (c) => new Function('C','N', `
+    const now=new Date(N); const checkInHistory=[];
+    ${grab('localDay')} ${grab('buildInactiveMap')} ${grab('isInactive')} ${grab('existingStatus')}
+    return existingStatus(C, buildInactiveMap());`)(c, NOW);
+  const cases = [
+    ['a normal child',        {name:'A, One', cls:'Nursery'},                                  'active'],
+    ['archived by hand',      {name:'B, Two', manualInactive:true},                            'archived'],
+    ['an old one-time guest', {name:'C, Three', oneTimeGuest:true, registeredAt:NOW-7*DAY},    'guest']
+  ];
+  const wrong = cases.filter(([,c,want]) => st(c) !== want).map(([l]) => l);
+  if (wrong.length) return 'wrong for: ' + wrong.join('; ');
+
+  const warn = (c, status, dob) => new Function('C','S','D', `
+    ${grab('duplicateWarning')} return duplicateWarning('Ellis Brannagh', D, C, S);`)(c, status, dob);
+  const archived = warn({name:'Brannagh, Ellis', bday:'2020-09-02'}, 'archived', '2020-09-02');
+  if (!archived.includes('ARCHIVED')) return 'archived record not called archived';
+  if (!archived.includes('birthday matches')) return 'matching birthday not mentioned';
+  if (!archived.includes('Make Active')) return 'does not name the real button';
+  if (!archived.includes('Inactive')) return 'does not say how the record is labelled';
+  if (archived.includes('Show archived')) return 'names a control that does not exist';
+  const active = warn({name:'Brannagh, Ellis', bday:'2019-01-01', cls:'Preschool'}, 'active', '2020-09-02');
+  if (!active.includes('ACTIVE') || !active.includes('Preschool')) return 'active record not located';
+  if (!active.includes('different birthday')) return 'differing birthday not mentioned';
+  return true;
+});
+
+await check('registering a second child of the same name never overwrites the first', () => {
+  const key = (base, roster) => new Function('B','R', `
+    ${grab('uniqueChildKey')} return uniqueChildKey(B,R);`)(base, roster);
+  const roster = [{fbKey:'Brannagh, Ellis'}];
+  if (key('Brannagh, Ellis', roster) !== 'Brannagh, Ellis_2') return 'second record would overwrite the first';
+  if (key('Brannagh, Ellis', roster.concat([{fbKey:'Brannagh, Ellis_2'}])) !== 'Brannagh, Ellis_3')
+    return 'third record collides';
+  if (key('Someone, New', roster) !== 'Someone, New') return 'an unused key should be left alone';
+  return true;
+});
+
+// ===========================================================================
 // render
 const out = document.getElementById('out');
 let lastGroup = null, failed = 0;
