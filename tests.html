@@ -524,6 +524,79 @@ await check('the message names the child and says how to undo it', () => {
 });
 
 // ===========================================================================
+group('Nobody is contacted twice');
+
+await check('one text per phone, however the number was typed', () => {
+  const dd = (list) => new Function('L', `
+    ${grab('normPhone')} ${grab('dedupePhones')} return dedupePhones(L);`)(list);
+
+  // the same parent number entered in both parent fields, formatted differently
+  const same = dd(['(289) 218-7488', '289-218-7488']);
+  if (same.phones.length !== 1) return 'same number twice sent ' + same.phones.length + ' texts';
+  if (same.phones[0] !== '2892187488') return 'not normalised: ' + same.phones[0];
+
+  // two genuinely different parents still both get one
+  const two = dd(['2892187488', '4165551234']);
+  if (two.phones.length !== 2) return 'two parents should get two texts, got ' + two.phones.length;
+
+  // blanks and country codes
+  if (dd(['', null, '  ']).phones.length !== 0) return 'blank numbers should be dropped';
+  if (dd(['+1 289 218 7488', '2892187488']).phones.length !== 1) return 'country code should match';
+  return true;
+});
+
+await check('one incident email per address, whatever the capitals', () => {
+  const dd = (list) => new Function('L', `${grab('dedupeEmails')} return dedupeEmails(L);`)(list);
+  if (dd(['Mum@Example.com', 'mum@example.com']).length !== 1) return 'same address twice';
+  if (dd(['mum@example.com', 'dad@example.com']).length !== 2) return 'two parents should both be kept';
+  if (dd(['mum@example.com', '', null]).length !== 1) return 'blanks should be dropped';
+  if (dd(['Mum@Example.com'])[0] !== 'Mum@Example.com') return 'should keep what was typed';
+  return true;
+});
+
+// ===========================================================================
+group('The message log says which parent');
+
+await check('the name is kept when sending, and worked out for older rows', () => {
+  const roster = [{name:'Gordon, Aryeh', p1name:'Sarah Gordon', p1phone:'(289) 218-7488',
+                                          p2name:'David Gordon', p2phone:'416-555-1234'}];
+  const who = (rec) => new Function('R','L', `
+    ${grab('normPhone')} ${grab('parentNameFor')} return parentNameFor(R,L);`)(rec, roster);
+
+  // a row written from now on carries the name itself
+  if (who({parent:'Sarah Gordon', child:'Gordon, Aryeh', to:'2892187488'}) !== 'Sarah Gordon')
+    return 'a stored name should be used as-is';
+
+  // older rows have no name - it is found from the number
+  if (who({child:'Gordon, Aryeh', to:'2892187488', raw:'(289) 218-7488'}) !== 'Sarah Gordon')
+    return 'parent 1 not matched on an older row';
+  if (who({child:'Gordon, Aryeh', to:'4165551234', raw:'416-555-1234'}) !== 'David Gordon')
+    return 'parent 2 not matched on an older row';
+
+  // and it degrades quietly rather than guessing
+  if (who({child:'Gordon, Aryeh', to:'9995550000'}) !== '') return 'an unknown number should give no name';
+  if (who({child:'Nobody, Here', to:'2892187488'}) !== '') return 'a child no longer on file should give no name';
+  if (who(null) !== '') return 'a missing record should give no name';
+  return true;
+});
+
+await check('the two parents of one child stay two separate texts', () => {
+  const dd = (list) => new Function('L', `
+    ${grab('normPhone')} ${grab('dedupePhones')} return dedupePhones(L);`)(list);
+  const two = dd([{phone:'(289) 218-7488', parent:'Sarah Gordon'},
+                  {phone:'416-555-1234',  parent:'David Gordon'}]);
+  if (two.phones.length !== 2) return 'two parents should still get two texts';
+  if (two.parentByPhone['2892187488'] !== 'Sarah Gordon') return 'wrong name against the first number';
+  if (two.parentByPhone['4165551234'] !== 'David Gordon') return 'wrong name against the second number';
+
+  // but one phone shared by both parents is still only texted once
+  const shared = dd([{phone:'2892187488', parent:'Sarah Gordon'},
+                     {phone:'289-218-7488', parent:'David Gordon'}]);
+  if (shared.phones.length !== 1) return 'a shared phone should be texted once';
+  return true;
+});
+
+// ===========================================================================
 // render
 const out = document.getElementById('out');
 let lastGroup = null, failed = 0;
