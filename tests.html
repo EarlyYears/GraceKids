@@ -695,6 +695,64 @@ await check('the form is emptied on Cancel but not before a successful save', ()
 });
 
 // ===========================================================================
+group('Make Active brings a child back');
+
+await check('it works on a child who has not been in for months', () => {
+  const NOW = new Date(2026,8,29,10,0).getTime(), DAY = 86400000;
+  const day = (ms) => { const d = new Date(ms);
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+
+  // presses Make Active, then asks whether the child is still hidden
+  const press = (child, history) => new Function('C','H','N', `
+    const now=new Date(N); const checkInHistory=H;
+    ${grab('localDay')} ${grab('buildInactiveMap')} ${grab('isInactive')}
+    const before = isInactive(C, buildInactiveMap());
+    C.manualInactive=false; C.oneTimeGuest=false; C.reactivatedAt=N;   // what setActive does
+    const after = isInactive(C, buildInactiveMap());
+    return {before, after};`)(child, history, NOW);
+
+  const cases = [
+    ['archived by hand',        {name:'A, One', manualInactive:true}, []],
+    ['old one-time guest',      {name:'B, Two', oneTimeGuest:true, registeredAt:NOW-30*DAY}, []],
+    ['not seen for 120 days',   {name:'C, Three'}, [{name:'C, Three', date:day(NOW-120*DAY)}]],
+    ['archived AND lapsed',     {name:'D, Four', manualInactive:true}, [{name:'D, Four', date:day(NOW-120*DAY)}]]
+  ];
+  const stuck = cases.filter(([,c,h]) => { const r = press(c,h); return !r.before || r.after; })
+                     .map(([l]) => l);
+  return stuck.length ? 'still hidden after pressing it: ' + stuck.join('; ') : true;
+});
+
+await check('a child who then stays away for another 90 days lapses again', () => {
+  const DAY = 86400000;
+  const hidden = (reactivatedAt, checkedOn, nowMs) => new Function('R','C','N', `
+    const now=new Date(N); const checkInHistory=[{name:'E, Five', date:C}];
+    ${grab('localDay')} ${grab('buildInactiveMap')} ${grab('isInactive')}
+    return isInactive({name:'E, Five', reactivatedAt:R}, buildInactiveMap());`)(reactivatedAt, checkedOn, nowMs);
+
+  const REACT = new Date(2026,5,1,10,0).getTime();          // reactivated 1 June
+  const OLD   = '2025-01-01';                                // last actually seen long before
+  if (hidden(REACT, OLD, REACT + 30*DAY))  return 'went inactive only 30 days after being reactivated';
+  if (hidden(REACT, OLD, REACT + 89*DAY))  return 'went inactive at 89 days';
+  if (!hidden(REACT, OLD, REACT + 95*DAY)) return 'never lapses again - the rule stopped working';
+  return true;
+});
+
+await check('the stamp survives a save and reload, and changes nothing else', () => {
+  const toFb   = grab('childToFb');
+  const fromFb = grab('fbToChild');
+  if (!toFb.includes('reactivatedAt')) return 'not saved to the database';
+  if (!fromFb.includes('reactivatedAt')) return 'not read back from the database';
+  // a child who has never been archived is untouched by any of this
+  const NOW = new Date(2026,8,29,10,0).getTime();
+  const neverArchived = new Function('N', `
+    const now=new Date(N); const checkInHistory=[];
+    ${grab('localDay')} ${grab('buildInactiveMap')} ${grab('isInactive')}
+    return isInactive({name:'F, Six'}, buildInactiveMap());`)(NOW);
+  if (neverArchived) return 'a child with no history should not be hidden';
+  return true;
+});
+
+// ===========================================================================
 // render
 const out = document.getElementById('out');
 let lastGroup = null, failed = 0;
