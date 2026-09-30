@@ -822,6 +822,41 @@ await check('a message the carrier never confirms stops saying "checking"', () =
 });
 
 // ===========================================================================
+group('Delivery is checked without anyone opening Reports');
+
+await check('sending a text starts the follow-up by itself', () => {
+  const log = grab('logTextSends');
+  if (!log.includes('scheduleDeliveryFollowUp()')) return 'a send does not start a follow-up';
+  // it must come after the records are written, or there is nothing to check yet
+  if (log.indexOf('scheduleDeliveryFollowUp()') < log.indexOf("data/messageLog/'+base"))
+    return 'the follow-up is started before the messages are written';
+  return true;
+});
+
+await check('it asks again a few times, then stops', async () => {
+  const AsyncFn = Object.getPrototypeOf(async function(){}).constructor;
+  const out = await new AsyncFn(`
+    const delays=[]; let checks=0;
+    const setTimeout=(fn,ms)=>{ delays.push(ms); };          // capture, never fire
+    const document={getElementById:()=>null};
+    const refreshDeliveryStatus=async()=>{ checks++; return 0; };
+    const renderMessageLog=async()=>{};
+    ${src.match(/var DELIVERY_FOLLOW_UPS=\[[^\]]*\];/)[0]}
+    ${grab('scheduleDeliveryFollowUp')}
+    scheduleDeliveryFollowUp();
+    return {delays, checks};`)();
+  if (out.delays.length < 2) return 'only ' + out.delays.length + ' attempt(s) - one is not enough if Twilio is slow';
+  if (out.delays.length > 5) return 'too many attempts: ' + out.delays.length;
+  const mins = out.delays.map(ms => ms/60000);
+  if (mins[0] > 1) return 'the first look is too late: ' + mins[0] + ' minutes';
+  if (Math.max(...mins) < 2) return 'it gives up too soon - last look at ' + Math.max(...mins) + ' minutes';
+  for (let i = 1; i < out.delays.length; i++)
+    if (out.delays[i] <= out.delays[i-1]) return 'the attempts are not spread out';
+  if (out.checks !== 0) return 'it checked straight away instead of waiting';
+  return true;
+});
+
+// ===========================================================================
 // render
 const out = document.getElementById('out');
 let lastGroup = null, failed = 0;
