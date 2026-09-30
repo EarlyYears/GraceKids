@@ -271,7 +271,8 @@ await check('delivery status is looked up, and only for messages still unresolve
       ]})};
     };
     var msgChecking=false; var msgCheckNote=''; var MSG_ENDPOINT='x';
-    ${grab('refreshDeliveryStatus')}
+    ${src.match(/var SENT_FINAL_MS=[^;]+;/)[0]}
+    ${grab('isResolvedStatus')} ${grab('deliveryStatusFor')} ${grab('refreshDeliveryStatus')}
     const n = await refreshDeliveryStatus();
     return {n, asked, written};
   `)(store);
@@ -775,6 +776,48 @@ await check('the note appears only while it is doing something', () => {
   if (note({}, '2026-06-28') !== '') return 'note shown on a child who was never made active';
   if (!/made active/.test(note({reactivatedAt:PRESSED}, null))) return 'no note on a child who has never checked in';
   if (note(null, null) !== '') return 'a missing record should give no note';
+  return true;
+});
+
+// ===========================================================================
+group('A delivered text stays delivered');
+
+await check('a settled message is never asked about or written over again', () => {
+  const settled = (st) => new Function('S', `${grab('isResolvedStatus')} return isResolvedStatus(S);`)(st);
+  const cases = [['delivered',true],['failed',true],['sent',true],
+                 ['accepted',false],['ok',false],['unconfirmed',false],['',false],[undefined,false]];
+  const wrong = cases.filter(([st,want]) => settled(st) !== want).map(([st]) => String(st));
+  if (wrong.length) return 'wrong for: ' + wrong.join(', ');
+  // and the checker uses that same rule to decide what to send to Twilio
+  const fn = grab('refreshDeliveryStatus');
+  if (!fn.includes('if(isResolvedStatus(r.status))return;')) return 'the checker no longer skips settled rows';
+  if (!fn.includes('cur[key]')) return 'the checker does not re-read before writing';
+  return true;
+});
+
+await check('a message the carrier never confirms stops saying "checking"', () => {
+  const MIN = 60000;
+  const st = (twilio, ageMin) => new Function('T','A', `
+    ${src.match(/var SENT_FINAL_MS=[^;]+;/)[0]}
+    ${grab('deliveryStatusFor')} return deliveryStatusFor(T, 1000000, 1000000 + A);`)(twilio, ageMin*MIN);
+  // the cases below assume that threshold is 30 minutes - if it changes, they should fail
+  const cases = [
+    ['delivered, straight away',   'delivered',   0,  'delivered'],
+    ['failed',                     'failed',      0,  'failed'],
+    ['undelivered',                'undelivered', 0,  'failed'],
+    ['just queued',                'queued',      0,  'accepted'],
+    ['sent a moment ago',          'sent',        1,  'accepted'],
+    ['sent, still early',          'sent',        29, 'accepted'],
+    ['sent and never confirmed',   'sent',        31, 'sent'],
+    ['sent hours ago',             'sent',        600,'sent'],
+    ['odd answer',                 'weird',       99, 'accepted']
+  ];
+  const wrong = cases.filter(([,t,a,want]) => st(t,a) !== want).map(([l]) => l);
+  if (wrong.length) return 'wrong for: ' + wrong.join('; ');
+  // the row must have a badge of its own, not the "checking delivery" one
+  const view = src.slice(src.indexOf('async function renderMessageLog('));
+  if (!view.includes("r.status==='sent'")) return 'no badge for a message the carrier never confirmed';
+  if (!/did not confirm/.test(view)) return 'the badge does not say what happened';
   return true;
 });
 
