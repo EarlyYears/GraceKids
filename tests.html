@@ -753,6 +753,32 @@ await check('the stamp survives a save and reload, and changes nothing else', ()
 });
 
 // ===========================================================================
+group('The registry says when a child was made active');
+
+await check('the note appears only while it is doing something', () => {
+  const DAY = 86400000;
+  const note = (child, last) => new Function('C','L', `
+    ${grab('localDay')} ${grab('reactivatedNote')} return reactivatedNote(C,L);`)(child, last);
+  const PRESSED = new Date(2026,8,29,11,0).getTime();
+
+  // made active, and not seen since - the note explains why they are still here
+  const stillOld = note({reactivatedAt:PRESSED}, '2026-06-28');
+  if (!/made active/.test(stillOld)) return 'no note on a child who was made active';
+  if (!/Sep\s*29/.test(stillOld)) return 'wrong date: ' + stillOld;
+
+  // they have since come back - the note has done its job and goes away
+  if (note({reactivatedAt:PRESSED}, '2026-10-05') !== '') return 'note lingers after they check in again';
+  // same day counts as caught up
+  if (note({reactivatedAt:PRESSED}, '2026-09-29') !== '') return 'note lingers after a check-in that day';
+
+  // never made active, or never checked in at all
+  if (note({}, '2026-06-28') !== '') return 'note shown on a child who was never made active';
+  if (!/made active/.test(note({reactivatedAt:PRESSED}, null))) return 'no note on a child who has never checked in';
+  if (note(null, null) !== '') return 'a missing record should give no note';
+  return true;
+});
+
+// ===========================================================================
 // render
 const out = document.getElementById('out');
 let lastGroup = null, failed = 0;
