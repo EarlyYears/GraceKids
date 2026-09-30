@@ -88,6 +88,11 @@ appears even when the module failed to parse, so it proves nothing.
   caused every child to be auto-checked-out mid evening service. Use `localDay()`.
 - **Escape anything a person typed** with `escHtml` before putting it on screen.
   A medical note reading "Give <half a tablet" is otherwise swallowed whole.
+- **Cancelling the duplicate-registration warning clears the whole form**, on
+  purpose - including any siblings already typed in. Aileen's reasoning: if a
+  sibling is already on file you go and edit that record in the Registry rather
+  than typing the family in again. Do not "improve" this into clearing only the
+  child that triggered the warning.
 - **Every check-out goes through the same confirmation pop-up**, one child or
   five, and that path is what records `coTime`/`coVia`/`coCode`. Do not add a
   shortcut that skips it — the last one silently stopped recording check-outs.
