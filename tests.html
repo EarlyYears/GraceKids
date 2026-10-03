@@ -857,6 +857,44 @@ await check('it asks again a few times, then stops', async () => {
 });
 
 // ===========================================================================
+group('One-to-One Care can actually be chosen');
+
+await check('choosing it goes straight through, with no warning to argue with', () => {
+  const printNow = grab('printNow');
+  if (/no room selected/.test(printNow)) return 'the warning is still there';
+  if (/Leave in One-to-One Care/.test(printNow)) return 'the loop is still there';
+  // the room the desk picked must still be recorded
+  if (!printNow.includes("placementCls=_pl?(_pl.value||null):null"))
+    return 'the chosen room is no longer saved';
+  return true;
+});
+
+await check('a child left in One-to-One Care is labelled that way on the tag', () => {
+  const tag = (placement) => new Function('P','N', `
+    const now=new Date(N); const session='morning';
+    const children=[{name:'Vantongeren, Ella', cls:'Nursery', sn:true, placementCls:P, code:'1234',
+                     medical:'', language:'', cl:{}}];
+    function escHtml(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+    ${grab('mkCL')} ${grab('buildPrintHTMLv2')}
+    return buildPrintHTMLv2(0,'1234',true);`)(placement, new Date(2026,9,4,10,0).getTime());
+
+  const left = tag(null);
+  if (!left.includes('One-to-One Care')) return 'a child left in 1:1 care is not labelled One-to-One Care';
+  const placed = tag('Preschool');
+  if (!placed.includes('Preschool (1:1)')) return 'a child placed in a room is not labelled with it';
+  if (placed.includes('>One-to-One Care<')) return 'a placed child is still labelled One-to-One Care';
+  return true;
+});
+
+await check('the room list follows the service, it is not fixed at page load', () => {
+  const apply = grab('applySession');
+  if (!apply.includes('placementOptions=')) return 'the room list is never updated when the service changes';
+  if (!/let placementOptions=/.test(src)) return 'the room list is still a constant';
+  if ((apply.match(/EV=/g) || []).length !== 1) return 'EV is set more than once in applySession';
+  return true;
+});
+
+// ===========================================================================
 // render
 const out = document.getElementById('out');
 let lastGroup = null, failed = 0;
