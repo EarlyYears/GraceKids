@@ -941,6 +941,16 @@ await check('fifteen minutes puts them in the red banner at the top', () => {
   return true;
 });
 
+await check('time alone is enough to raise the alert', () => {
+  const refresh = grab('refreshNow');
+  if (!/renderDashboard\(\)/.test(refresh))
+    return 'the minute tick never redraws the dashboard, so a warning that only time can trigger never appears';
+  // and the escalation really is time-based, not change-based
+  const dash = grab('renderDashboard');
+  if (!dash.includes('outOverdue(c,_dashNow)')) return 'the escalation is not worked out from the clock';
+  return true;
+});
+
 await check('a child out of the room is still checked in, and still counts', () => {
   const out = grab('markOutOfRoom');
   if (/checkedIn\s*=/.test(out)) return 'marking a child out changes whether they are checked in';
@@ -990,13 +1000,21 @@ await check('the class list puts whoever is missing at the top', () => {
 
 await check('the Out and Back buttons sit at the far right of the row', () => {
   const popup = grab('openClassPopup');
-  const btn = popup.match(/<button class="btn small" onclick="[^"]*"[^`]*?>/);
-  if (!btn) return 'could not find the button';
-  if (!/margin-left:auto/.test(btn[0])) return 'the button is not pushed to the right';
+  // pull out each button by the function it calls, rather than by pattern
+  const tagAround = (needle) => {
+    const i = popup.indexOf(needle); if (i < 0) return null;
+    return popup.slice(popup.lastIndexOf('<button', i), popup.indexOf('</button>', i));
+  };
+  const restroom = tagAround("markBackInRoom('");
+  if (!restroom) return 'could not find the restroom button';
+  if (!/margin-left:auto/.test(restroom)) return 'the restroom button is not pushed to the right';
+  const left = tagAround("parentLeft('");
+  if (!left) return 'the Left button is missing';
+  if (/margin-left:auto/.test(left)) return 'the Left button should sit beside the parent, not at the edge';
   // the word must not be confusable with checking a child out
   const popupText = popup.slice(popup.indexOf('markBackInRoom'));
   if (/>\$\{_out\?'Back':'Out'\}/.test(popup)) return 'the button still says Out, which reads as checked out';
-  if (!/'Back':'Restroom'/.test(popup)) return 'the button no longer says Restroom';
+  if (!/'Returned':'Restroom'/.test(popup)) return 'the buttons should read Restroom and Returned';
   // and the row it sits in must not be fighting that
   const rowCss = src.match(/\.popup-child-row\{[^}]*\}/);
   if (rowCss && /justify-content:\s*(flex-end|center)/.test(rowCss[0]))
