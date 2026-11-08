@@ -1022,6 +1022,15 @@ await check('the Out and Back buttons sit at the far right of the row', () => {
   return true;
 });
 
+await check('the settling note never guesses which parent stayed', () => {
+  const popup = grab('openClassPopup');
+  if (/parentLabel/.test(popup)) return 'it still names a parent it cannot know';
+  if (/p1name/.test(popup)) return 'it is still reaching for parent one';
+  if (!/Parent sitting in/.test(popup)) return 'the note is missing';
+  if (/parentLabel/.test(src)) return 'the name helper is still in the file';
+  return true;
+});
+
 await check('only children actually out are named in the warning', () => {
   const names = (kids) => new Function('K', `${grab('outOfRoomNames')} return outOfRoomNames(K);`)(kids);
   const kids = [{name:'A, One'}, {name:'B, Two', outAt:1000}, {name:'C, Three', outAt:null}];
