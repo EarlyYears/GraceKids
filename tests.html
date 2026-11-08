@@ -1008,6 +1008,7 @@ await check('each box appears for the classes it belongs to', () => {
       const placementOptions=OPTS;
       function escHtml(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
       function fullName(n){var p=String(n).split(', ');return (p[1]||'')+' '+(p[0]||'');}
+      ${src.match(/var OUT_WARN_MIN=[^;]+;/)[0]}
       ${grab('mkCL')} ${grab('buildFamilyPreviewHTML')}
       return buildFamilyPreviewHTML(M,'1234');`)(
         [{name:'A, Kid', cls, medical:'', code:'1234', cl:{}}], ['Nursery','Preschool','Kindergarten']);
@@ -1032,6 +1033,55 @@ await check('each box appears for the classes it belongs to', () => {
     if (extra.length)   problems.push(cls + ' should not offer ' + extra.join(', '));
   });
   return problems.length ? problems.join('; ') : true;
+});
+
+// ===========================================================================
+group('A parent staying to settle');
+
+await check('the reminder is due after ten minutes, and only for the right children', () => {
+  const MIN = 60000, T = 1000000;
+  const due = (roster, now) => new Function('R','N', `
+    ${src.match(/var OUT_WARN_MIN=[^;]+;/)[0]}
+    ${grab('settleDue')} return settleDue(R,N).map(c=>c.name);`)(roster, now);
+
+  const roster = [
+    {name:'Just, In',     checkedIn:true,  parentStayAt:T - 2*MIN},
+    {name:'Nearly, There',checkedIn:true,  parentStayAt:T - 9*MIN},
+    {name:'Due, Now',     checkedIn:true,  parentStayAt:T - 10*MIN},
+    {name:'Long, Over',   checkedIn:true,  parentStayAt:T - 40*MIN},
+    {name:'Gone, Home',   checkedIn:false, parentStayAt:T - 40*MIN},
+    {name:'No, Parent',   checkedIn:true,  parentStayAt:null}
+  ];
+  const got = due(roster, T);
+  const want = ['Due, Now','Long, Over'];
+  if (JSON.stringify(got) !== JSON.stringify(want))
+    return 'due: ' + JSON.stringify(got) + ' — wanted ' + JSON.stringify(want);
+  return true;
+});
+
+await check('dismissing it clears the child, so it does not come back', () => {
+  const dismiss = grab('dismissCheckinAlert');
+  if (!dismiss.includes('clearStay')) return 'dismissing does not clear anything';
+  if (!dismiss.includes('parentStayAt=null')) return 'the flag survives being dismissed';
+  if (!dismiss.includes('syncOneChild')) return 'the other desks are never told';
+  // and it is raised once, not every minute
+  const checker = grab('checkSettleAlerts');
+  if (!checker.includes('settleQueued')) return 'it would nag every minute';
+  if (!checker.includes("display==='flex'")) return 'it would interrupt an alert already on screen';
+  return true;
+});
+
+await check('ticking the box at check-in is what starts the clock', () => {
+  const print = grab('printNow');
+  if (!print.includes('parentStayAt=')) return 'checking in never records a settling parent';
+  if (!/pendingStay/.test(print)) return 'the tick box is not read at check-in';
+  // a check-out or reset must clear it
+  const routes = ['confirmFamilyCheckout','confirmCodeCheckout','doClassCheckout','startNewSession','autoResetSession'];
+  const missing = routes.filter(r => !grab(r).includes('parentStayAt=null'));
+  if (missing.length) return 'does not clear it: ' + missing.join(', ');
+  // and it must not print on the name tag - it is a desk reminder, not care information
+  if (/parentStay/.test(grab('buildPrintHTMLv2'))) return 'it is being printed on the tag';
+  return true;
 });
 
 // ===========================================================================
