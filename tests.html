@@ -1147,6 +1147,29 @@ await check('ticking the box at check-in is what starts the clock', () => {
 });
 
 // ===========================================================================
+group('The pop-up and the reminder survive a busy desk');
+
+await check('a check-in does not throw away a reminder that is waiting', () => {
+  const show = grab('showCheckinAlerts');
+  if (/checkinAlertQueue\s*=\s*q\s*;/.test(show))
+    return 'a check-in replaces the queue, discarding a settling reminder that was waiting';
+  if (!show.includes("a.t==='settle'")) return 'settling reminders are not carried over';
+  // and once queued it is not re-raised, so losing it would lose it for good
+  if (!grab('checkSettleAlerts').includes('settleQueued')) return 'the guard against nagging is gone';
+  return true;
+});
+
+await check('refreshing the open class list does not jump it back to the top', () => {
+  const popup = grab('openClassPopup');
+  if (!popup.includes('scrollTop')) return 'the scroll position is not kept across a refresh';
+  if (!/_keepScroll/.test(popup)) return 'nothing remembers where the list was';
+  // the dashboard is what refreshes it, every minute
+  if (!grab('renderDashboard').includes('openClassPopup(popupCls)'))
+    return 'the open pop-up is no longer kept up to date';
+  return true;
+});
+
+// ===========================================================================
 // render
 const out = document.getElementById('out');
 let lastGroup = null, failed = 0;
