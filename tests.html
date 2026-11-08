@@ -902,7 +902,8 @@ await check('how long they have been out reads sensibly', () => {
   const lab = (mins) => new Function('M', `${grab('outLabel')} return outLabel(M);`)(mins);
   const mo  = (outAt, now) => new Function('O','N', `
     ${grab('minutesOut')} return minutesOut({outAt:O}, N);`)(outAt, now);
-  const long = (mins) => new Function('M', `${grab('outIsLong')} return outIsLong(M);`)(mins);
+  const lvl = (mins) => new Function('M', `
+    ${src.match(/var OUT_WARN_MIN=[^;]+;/)[0]} ${grab('outLevel')} return outLevel(M);`)(mins);
 
   if (mo(null, 1000) !== null) return 'a child in the room should have no duration';
   if (mo(1000, 1000 + 12*MIN) !== 12) return '12 minutes misread as ' + mo(1000, 1000+12*MIN);
@@ -912,10 +913,31 @@ await check('how long they have been out reads sensibly', () => {
   const wrong = words.filter(([m,w]) => lab(m) !== w).map(([m]) => m + ' -> "' + lab(m) + '"');
   if (wrong.length) return 'wrong wording for: ' + wrong.join('; ');
 
-  // the nag threshold
-  if (long(14)) return '14 minutes should not be flagged yet';
-  if (!long(15)) return '15 minutes should be flagged';
-  if (long(null)) return 'a child in the room should never be flagged';
+  // three tiers: quiet, then a warning at ten, then a red alert at fifteen
+  const tiers = [[0,0],[5,0],[9,0],[10,1],[14,1],[15,2],[40,2]];
+  const wrongTier = tiers.filter(([m,want]) => lvl(m) !== want).map(([m]) => m + ' min');
+  if (wrongTier.length) return 'wrong tier at: ' + wrongTier.join(', ');
+  if (lvl(null) !== 0) return 'a child in the room should never be flagged';
+  return true;
+});
+
+await check('fifteen minutes puts them in the red banner at the top', () => {
+  const dash = grab('renderDashboard');
+  if (!dash.includes('outOverdue')) return 'nothing escalates when a child has been out a while';
+  // it must go to the red list, not the yellow one
+  const push = dash.match(/if\(outLate\.length\)allW\.push\([^;]*\);/);
+  if (!push) return 'no warning is raised for the class';
+  if (/yellow:/.test(push[0])) return 'it goes to the yellow banner, not the red one';
+  if (!/out of the room/.test(push[0])) return 'the warning does not say what is wrong';
+  if (!/fullName/.test(push[0])) return 'the warning does not name the child';
+  // One-to-One children are covered too
+  if (!dash.includes('snOutLate')) return 'a One-to-One child out of the room never escalates';
+  const over = (mins) => new Function('M', `
+    ${src.match(/var OUT_WARN_MIN=[^;]+;/)[0]}
+    ${grab('minutesOut')} ${grab('outLevel')} ${grab('outOverdue')}
+    return outOverdue({outAt: 1000}, 1000 + M*60000);`)(mins);
+  if (over(14)) return '14 minutes should not reach the red banner';
+  if (!over(15)) return '15 minutes should reach the red banner';
   return true;
 });
 
