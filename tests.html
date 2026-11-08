@@ -182,7 +182,7 @@ await check('a check-out records the time and the code that was presented', asyn
     ${grab('escHtml')}
     const closeAllModals=()=>{}, focusSearch=()=>{}, renderList=()=>{}, renderDashboard=()=>{};
     const syncOneChild=async()=>{}; const alert=()=>{};
-    ${grab('checkoutRowHTML')} ${grab('confirmFamilyCheckout')}
+    ${grab('outOfRoomNames')} ${grab('checkoutRowHTML')} ${grab('confirmFamilyCheckout')}
     pendingCheckoutNames=children.map(c=>c.name);
     BOX.innerHTML=children.map((c,i)=>checkoutRowHTML(c,i,'co-fam',false)).join('');
     BOX.querySelector('#co-fam-1').checked=false;      // Ben stays in
@@ -891,6 +891,88 @@ await check('the room list follows the service, it is not fixed at page load', (
   if (!apply.includes('placementOptions=')) return 'the room list is never updated when the service changes';
   if (!/let placementOptions=/.test(src)) return 'the room list is still a constant';
   if ((apply.match(/EV=/g) || []).length !== 1) return 'EV is set more than once in applySession';
+  return true;
+});
+
+// ===========================================================================
+group('Knowing who has left the room');
+
+await check('how long they have been out reads sensibly', () => {
+  const MIN = 60000;
+  const lab = (mins) => new Function('M', `${grab('outLabel')} return outLabel(M);`)(mins);
+  const mo  = (outAt, now) => new Function('O','N', `
+    ${grab('minutesOut')} return minutesOut({outAt:O}, N);`)(outAt, now);
+  const long = (mins) => new Function('M', `${grab('outIsLong')} return outIsLong(M);`)(mins);
+
+  if (mo(null, 1000) !== null) return 'a child in the room should have no duration';
+  if (mo(1000, 1000 + 12*MIN) !== 12) return '12 minutes misread as ' + mo(1000, 1000+12*MIN);
+  if (mo(1000, 500) !== 0) return 'a clock skew should not give a negative time';
+
+  const words = [[0,'just now'],[1,'1 min'],[12,'12 min'],[59,'59 min'],[60,'1 hr'],[75,'1 hr 15 min'],[130,'2 hrs 10 min']];
+  const wrong = words.filter(([m,w]) => lab(m) !== w).map(([m]) => m + ' -> "' + lab(m) + '"');
+  if (wrong.length) return 'wrong wording for: ' + wrong.join('; ');
+
+  // the nag threshold
+  if (long(14)) return '14 minutes should not be flagged yet';
+  if (!long(15)) return '15 minutes should be flagged';
+  if (long(null)) return 'a child in the room should never be flagged';
+  return true;
+});
+
+await check('a child out of the room is still checked in, and still counts', () => {
+  const out = grab('markOutOfRoom');
+  if (/checkedIn\s*=/.test(out)) return 'marking a child out changes whether they are checked in';
+  if (!out.includes('outAt=Date.now()')) return 'the time they left is not recorded';
+  const back = grab('markBackInRoom');
+  if (!back.includes('outAt=null')) return 'coming back does not clear it';
+  if (/checkedIn\s*=/.test(back)) return 'coming back changes whether they are checked in';
+  // the class card counts them as present, and says how many are out
+  const dash = grab('renderDashboard');
+  if (!dash.includes('c.checkedIn&&c.outAt')) return 'the card does not count who is out';
+  if (/const all=children\.filter\(c=>c\.checkedIn&&!c\.outAt/.test(dash))
+    return 'a child out of the room has been dropped from the room total';
+  return true;
+});
+
+await check('checking out is cleared and queried in every route', () => {
+  const routes = ['confirmFamilyCheckout','confirmCodeCheckout','doClassCheckout'];
+  const missingClear = routes.filter(r => !grab(r).includes('outAt=null'));
+  if (missingClear.length) return 'does not clear the flag: ' + missingClear.join(', ');
+  const missingWarn = routes.filter(r => !grab(r).includes('outOfRoomNames'));
+  if (missingWarn.length) return 'checks out an absent child without asking: ' + missingWarn.join(', ');
+  // and a session reset clears it
+  const resets = ['startNewSession','autoResetSession'].filter(r => !grab(r).includes('outAt=null'));
+  if (resets.length) return 'a session reset leaves children marked out: ' + resets.join(', ');
+  return true;
+});
+
+await check('the class list puts whoever is missing at the top', () => {
+  const popup = grab('openClassPopup');
+  const m = popup.match(/inClass=inClass\.sort\(\(a,b\)=>\{[\s\S]*?\}\);/);
+  if (!m) return 'could not find the ordering';
+  const order = new Function('L', `let inClass=L; ${m[0]} return inClass.map(c=>c.name);`);
+  const T = Date.now();
+  const got = order([
+    {name:'D, Four'},
+    {name:'C, Three', medical:'Allergy'},
+    {name:'B, Two',  outAt:T-5*60000},
+    {name:'A, One',  outAt:T-40*60000}
+  ]);
+  // out of the room first, longest away first, then medical, then the rest
+  const want = ['A, One','B, Two','C, Three','D, Four'];
+  if (JSON.stringify(got) !== JSON.stringify(want))
+    return 'ordered ' + got.join(', ') + ' — wanted ' + want.join(', ');
+  if (!popup.includes('out of the room')) return 'the header does not say how many are out';
+  return true;
+});
+
+await check('only children actually out are named in the warning', () => {
+  const names = (kids) => new Function('K', `${grab('outOfRoomNames')} return outOfRoomNames(K);`)(kids);
+  const kids = [{name:'A, One'}, {name:'B, Two', outAt:1000}, {name:'C, Three', outAt:null}];
+  const got = names(kids);
+  if (JSON.stringify(got) !== JSON.stringify(['B, Two'])) return 'named the wrong children: ' + JSON.stringify(got);
+  if (names([]).length !== 0) return 'an empty list should name nobody';
+  if (names(null).length !== 0) return 'a missing list should name nobody';
   return true;
 });
 
