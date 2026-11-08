@@ -993,6 +993,10 @@ await check('the Out and Back buttons sit at the far right of the row', () => {
   const btn = popup.match(/<button class="btn small" onclick="[^"]*"[^`]*?>/);
   if (!btn) return 'could not find the button';
   if (!/margin-left:auto/.test(btn[0])) return 'the button is not pushed to the right';
+  // the word must not be confusable with checking a child out
+  const popupText = popup.slice(popup.indexOf('markBackInRoom'));
+  if (/>\$\{_out\?'Back':'Out'\}/.test(popup)) return 'the button still says Out, which reads as checked out';
+  if (!/'Back':'Restroom'/.test(popup)) return 'the button no longer says Restroom';
   // and the row it sits in must not be fighting that
   const rowCss = src.match(/\.popup-child-row\{[^}]*\}/);
   if (rowCss && /justify-content:\s*(flex-end|center)/.test(rowCss[0]))
