@@ -1110,11 +1110,20 @@ await check('the reminder is due after ten minutes, and only for the right child
   return true;
 });
 
-await check('dismissing it clears the child, so it does not come back', () => {
+await check('dismissing the reminder does not say the parent has gone', () => {
   const dismiss = grab('dismissCheckinAlert');
-  if (!dismiss.includes('clearStay')) return 'dismissing does not clear anything';
-  if (!dismiss.includes('parentStayAt=null')) return 'the flag survives being dismissed';
+  if (!dismiss.includes('clearStay')) return 'dismissing does nothing at all';
+  if (/parentStayAt\s*=\s*null/.test(dismiss))
+    return 'pressing OK wipes the parent, instead of leaving them sitting in';
+  if (!dismiss.includes('settleReminded=true')) return 'it does not record that the desk was told';
   if (!dismiss.includes('syncOneChild')) return 'the other desks are never told';
+  // only Left says they have gone
+  const left = grab('parentLeft');
+  if (!left.includes('parentStayAt=null')) return 'Left does not clear the parent';
+  if (!left.includes('settleReminded=false')) return 'Left leaves the reminder spent';
+  // and the reminder is only due while it has not been given
+  const due = grab('settleDue');
+  if (!due.includes('!c.settleReminded')) return 'the reminder would come round again';
   // and it is raised once, not every minute
   const checker = grab('checkSettleAlerts');
   if (!checker.includes('settleQueued')) return 'it would nag every minute';
@@ -1130,6 +1139,8 @@ await check('ticking the box at check-in is what starts the clock', () => {
   const routes = ['confirmFamilyCheckout','confirmCodeCheckout','doClassCheckout','startNewSession','autoResetSession'];
   const missing = routes.filter(r => !grab(r).includes('parentStayAt=null'));
   if (missing.length) return 'does not clear it: ' + missing.join(', ');
+  const stale = routes.filter(r => !grab(r).includes('settleReminded=false'));
+  if (stale.length) return 'leaves the reminder spent for next time: ' + stale.join(', ');
   // and it must not print on the name tag - it is a desk reminder, not care information
   if (/parentStay/.test(grab('buildPrintHTMLv2'))) return 'it is being printed on the tag';
   return true;
