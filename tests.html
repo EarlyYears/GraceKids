@@ -977,6 +977,42 @@ await check('only children actually out are named in the warning', () => {
 });
 
 // ===========================================================================
+group('The right tick boxes for the right class');
+
+await check('each box appears for the classes it belongs to', () => {
+  const boxesFor = (cls) => {
+    const host = document.createElement('div'); host.style.display='none'; document.body.appendChild(host);
+    host.innerHTML = new Function('M','OPTS', `
+      const placementOptions=OPTS;
+      function escHtml(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+      function fullName(n){var p=String(n).split(', ');return (p[1]||'')+' '+(p[0]||'');}
+      ${grab('mkCL')} ${grab('buildFamilyPreviewHTML')}
+      return buildFamilyPreviewHTML(M,'1234');`)(
+        [{name:'A, Kid', cls, medical:'', code:'1234', cl:{}}], ['Nursery','Preschool','Kindergarten']);
+    const labels = [...host.querySelectorAll('label')].map(l => l.textContent.trim());
+    host.remove();
+    return labels;
+  };
+
+  const expect = {
+    'Nursery':     ['Ill in last 48hrs?','No Snack','Has a Bag','Has a Cup','Do NOT Change','Does Not Sit','Potty Training'],
+    'Preschool':   ['Ill in last 48hrs?','No Snack','Has a Bag','Has a Cup','Do NOT Change','Potty Training'],
+    'Kindergarten':['Ill in last 48hrs?','No Snack','Has a Bag','Has a Cup'],
+    'Jr Youth':    ['Ill in last 48hrs?','No Snack','Has a Bag','Has a Cup']
+  };
+  const problems = [];
+  Object.keys(expect).forEach(cls => {
+    const got = boxesFor(cls).filter(l => expect['Nursery'].includes(l));
+    const want = expect[cls];
+    const missing = want.filter(w => !got.includes(w));
+    const extra   = got.filter(g => !want.includes(g));
+    if (missing.length) problems.push(cls + ' is missing ' + missing.join(', '));
+    if (extra.length)   problems.push(cls + ' should not offer ' + extra.join(', '));
+  });
+  return problems.length ? problems.join('; ') : true;
+});
+
+// ===========================================================================
 // render
 const out = document.getElementById('out');
 let lastGroup = null, failed = 0;
