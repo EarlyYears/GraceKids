@@ -1005,12 +1005,14 @@ await check('the Out and Back buttons sit at the far right of the row', () => {
     const i = popup.indexOf(needle); if (i < 0) return null;
     return popup.slice(popup.lastIndexOf('<button', i), popup.indexOf('</button>', i));
   };
-  const restroom = tagAround("markBackInRoom('");
-  if (!restroom) return 'could not find the restroom button';
-  if (!/margin-left:auto/.test(restroom)) return 'the restroom button is not pushed to the right';
-  const left = tagAround("parentLeft('");
-  if (!left) return 'the Left button is missing';
-  if (/margin-left:auto/.test(left)) return 'the Left button should sit beside the parent, not at the edge';
+  if (!popup.includes("markBackInRoom('")) return 'could not find the restroom button';
+  if (!popup.includes("parentLeft('")) return 'the Left button is missing';
+  // both buttons live in one right-hand column, stacked
+  const col = popup.slice(popup.indexOf('margin-left:auto'), popup.indexOf("parentLeft('"));
+  if (!/flex-direction:column/.test(col)) return 'the buttons are not stacked in a column';
+  if (!/margin-left:auto/.test(col)) return 'the column is not pushed to the right';
+  if (popup.indexOf("markBackInRoom('") > popup.indexOf("parentLeft('"))
+    return 'Left should sit under the restroom button, not above it';
   // the word must not be confusable with checking a child out
   const popupText = popup.slice(popup.indexOf('markBackInRoom'));
   if (/>\$\{_out\?'Back':'Out'\}/.test(popup)) return 'the button still says Out, which reads as checked out';
