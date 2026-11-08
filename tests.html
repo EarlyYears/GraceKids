@@ -1017,12 +1017,18 @@ await check('each box appears for the classes it belongs to', () => {
     return labels;
   };
 
+  const SETTLE = 'Parent staying to settle';
   const expect = {
     'Nursery':     ['Ill in last 48hrs?','No Snack','Has a Bag','Has a Cup','Do NOT Change','Does Not Sit','Potty Training'],
     'Preschool':   ['Ill in last 48hrs?','No Snack','Has a Bag','Has a Cup','Do NOT Change','Potty Training'],
     'Kindergarten':['Ill in last 48hrs?','No Snack','Has a Bag','Has a Cup'],
     'Jr Youth':    ['Ill in last 48hrs?','No Snack','Has a Bag','Has a Cup']
   };
+  // the settling box belongs only to the three youngest classes
+  const settleWant = {'Nursery':true,'Preschool':true,'Kindergarten':true,'Jr Youth':false,'GraceKids 1':false,'GraceKids 2A':false,'GraceKids 2B':false};
+  const settleWrong = Object.keys(settleWant).filter(cls =>
+    boxesFor(cls).some(l => l.indexOf(SETTLE) === 0) !== settleWant[cls]);
+  if (settleWrong.length) return 'settling box wrong for: ' + settleWrong.join(', ');
   const problems = [];
   Object.keys(expect).forEach(cls => {
     const got = boxesFor(cls).filter(l => expect['Nursery'].includes(l));
