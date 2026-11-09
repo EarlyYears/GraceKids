@@ -913,15 +913,24 @@ await check('how long they have been out reads sensibly', () => {
   const wrong = words.filter(([m,w]) => lab(m) !== w).map(([m]) => m + ' -> "' + lab(m) + '"');
   if (wrong.length) return 'wrong wording for: ' + wrong.join('; ');
 
-  // three tiers: quiet, then a warning at ten, then a red alert at fifteen
-  const tiers = [[0,0],[5,0],[9,0],[10,1],[14,1],[15,2],[40,2]];
+  // three tiers: quiet, then a warning at five, then a red alert at seven
+  const tiers = [[0,0],[2,0],[4,0],[5,1],[6,1],[7,2],[40,2]];
   const wrongTier = tiers.filter(([m,want]) => lvl(m) !== want).map(([m]) => m + ' min');
   if (wrongTier.length) return 'wrong tier at: ' + wrongTier.join(', ');
   if (lvl(null) !== 0) return 'a child in the room should never be flagged';
   return true;
 });
 
-await check('fifteen minutes puts them in the red banner at the top', () => {
+await check('the washroom thresholds are five and seven minutes', () => {
+  const line = src.match(/var OUT_WARN_MIN=(\d+),OUT_ALERT_MIN=(\d+),PARENT_SETTLE_MIN=(\d+);/);
+  if (!line) return 'could not find the thresholds';
+  if (line[1] !== '5') return 'the first warning is at ' + line[1] + ' minutes, expected 5';
+  if (line[2] !== '7') return 'the red alert is at ' + line[2] + ' minutes, expected 7';
+  if (line[3] !== '10') return 'the settling reminder moved to ' + line[3] + ' minutes, expected 10';
+  return true;
+});
+
+await check('seven minutes puts them in the red banner at the top', () => {
   const dash = grab('renderDashboard');
   if (!dash.includes('outOverdue')) return 'nothing escalates when a child has been out a while';
   // it must go to the red list, not the yellow one
@@ -936,8 +945,8 @@ await check('fifteen minutes puts them in the red banner at the top', () => {
     ${src.match(/var OUT_WARN_MIN=[^;]+;/)[0]}
     ${grab('minutesOut')} ${grab('outLevel')} ${grab('outOverdue')}
     return outOverdue({outAt: 1000}, 1000 + M*60000);`)(mins);
-  if (over(14)) return '14 minutes should not reach the red banner';
-  if (!over(15)) return '15 minutes should reach the red banner';
+  if (over(6)) return '6 minutes should not reach the red banner';
+  if (!over(7)) return '7 minutes should reach the red banner';
   return true;
 });
 
