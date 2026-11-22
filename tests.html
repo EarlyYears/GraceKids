@@ -921,13 +921,15 @@ await check('how long they have been out reads sensibly', () => {
   return true;
 });
 
-await check('the washroom thresholds are five and seven minutes', () => {
-  const line = src.match(/var OUT_WARN_MIN=(\d+),OUT_ALERT_MIN=(\d+),PARENT_SETTLE_MIN=(\d+);/);
+await check('all four clocks are the numbers Aileen asked for', () => {
+  const line = src.match(/var OUT_WARN_MIN=(\d+),OUT_ALERT_MIN=(\d+),FEED_WARN_MIN=(\d+),FEED_ALERT_MIN=(\d+),PARENT_SETTLE_MIN=(\d+);/);
   if (!line) return 'could not find the thresholds';
-  if (line[1] !== '5') return 'the first warning is at ' + line[1] + ' minutes, expected 5';
-  if (line[2] !== '7') return 'the red alert is at ' + line[2] + ' minutes, expected 7';
-  if (line[3] !== '10') return 'the settling reminder moved to ' + line[3] + ' minutes, expected 10';
-  return true;
+  const want = {'washroom warning':['5',line[1]], 'washroom red alert':['7',line[2]],
+                'feeding warning':['25',line[3]], 'feeding red alert':['40',line[4]],
+                'settling reminder':['10',line[5]]};
+  const wrong = Object.keys(want).filter(k => want[k][0] !== want[k][1])
+    .map(k => k + ' is ' + want[k][1] + ', expected ' + want[k][0]);
+  return wrong.length ? wrong.join('; ') : true;
 });
 
 await check('seven minutes puts them in the red banner at the top', () => {
@@ -937,7 +939,7 @@ await check('seven minutes puts them in the red banner at the top', () => {
   const push = dash.match(/if\(outLate\.length\)allW\.push\([^;]*\);/);
   if (!push) return 'no warning is raised for the class';
   if (/yellow:/.test(push[0])) return 'it goes to the yellow banner, not the red one';
-  if (!/out of the room/.test(push[0])) return 'the warning does not say what is wrong';
+  if (!/outWord\(c\)/.test(push[0])) return 'the warning does not say whether it is a washroom trip or a feed';
   if (!/fullName/.test(push[0])) return 'the warning does not name the child';
   // One-to-One children are covered too
   if (!dash.includes('snOutLate')) return 'a One-to-One child out of the room never escalates';
@@ -1180,6 +1182,192 @@ await check('refreshing the open class list does not jump it back to the top', (
 
 // ===========================================================================
 // render
+
+// ===========================================================================
+group('Feeding a baby in the nursery');
+
+await check('a feed runs on a longer clock than a washroom trip', () => {
+  const lvl = (mins, reason) => new Function('M','R', `
+    ${src.match(/var OUT_WARN_MIN=[^;]+;/)[0]} ${grab('outLevel')} return outLevel(M,R);`)(mins, reason);
+
+  const washroom = [[0,0],[4,0],[5,1],[6,1],[7,2],[40,2]];
+  const feeding  = [[0,0],[10,0],[24,0],[25,1],[39,1],[40,2],[120,2]];
+  const bad = [];
+  washroom.forEach(([m,want]) => { if (lvl(m,'washroom') !== want) bad.push('washroom at ' + m + ' min'); });
+  feeding .forEach(([m,want]) => { if (lvl(m,'feeding')  !== want) bad.push('feeding at '  + m + ' min'); });
+  // no reason recorded must behave exactly like a washroom trip
+  if (lvl(7) !== 2 || lvl(24) !== 2) bad.push('a child with no reason is not treated as a washroom trip');
+  if (lvl(null,'feeding') !== 0) bad.push('a baby in the room is flagged');
+  return bad.length ? 'wrong tier for: ' + bad.join(', ') : true;
+});
+
+await check('a baby being fed does not set off the red alert for forty minutes', () => {
+  const over = (mins, reason) => new Function('M','R', `
+    ${src.match(/var OUT_WARN_MIN=[^;]+;/)[0]}
+    ${grab('minutesOut')} ${grab('outLevel')} ${grab('outOverdue')}
+    return outOverdue({outAt: 1000, outReason: R}, 1000 + M*60000);`)(mins, reason);
+
+  if (over(10,'feeding')) return '10 minutes into a feed should be quiet';
+  if (over(25,'feeding')) return '25 minutes into a feed is a warning, not a red alert';
+  if (over(39,'feeding')) return '39 minutes into a feed should not be red yet';
+  if (!over(40,'feeding')) return '40 minutes into a feed should reach the red banner';
+  // and a washroom trip is untouched by any of this
+  if (over(6,'washroom')) return 'a washroom trip went red early';
+  if (!over(7,'washroom')) return 'a washroom trip no longer reaches the red banner at 7 minutes';
+  return true;
+});
+
+await check('the dashboard says whether it is a washroom trip or a feed', () => {
+  const word = (reason) => new Function('R', `${grab('outWord')} return outWord({outReason:R});`)(reason);
+  if (word('feeding') !== 'out feeding') return 'a feed reads as "' + word('feeding') + '"';
+  if (word('washroom') !== 'out of the room') return 'a washroom trip reads as "' + word('washroom') + '"';
+  if (word(null) !== 'out of the room') return 'a child with no reason reads as "' + word(null) + '"';
+  const popup = grab('openClassPopup');
+  if (!/OUT \\u2014 FEEDING/.test(popup)) return 'the class list row never says FEEDING';
+  if (!/OUT OF ROOM/.test(popup)) return 'the class list row no longer says OUT OF ROOM';
+  return true;
+});
+
+await check('only the nursery gets a Feeding button, and only while the baby is in', () => {
+  const popup = grab('openClassPopup');
+  const i = popup.indexOf('>Feeding</button>');
+  if (i < 0) return 'there is no Feeding button';
+  const btn = popup.slice(popup.lastIndexOf('(!_out', i), i + 20);
+  if (!/cls===['"]Nursery['"]/.test(btn)) return 'the Feeding button is not limited to the nursery';
+  if (!/^\(!_out/.test(btn)) return 'the Feeding button shows even when the baby is already out';
+  if (!/markOutOfRoom\('\$\{_safe\}','feeding'\)/.test(btn)) return 'the Feeding button does not record a feed';
+  if (!/markOutOfRoom\('\$\{_safe\}','washroom'\)/.test(popup)) return 'the Restroom button does not record a washroom trip';
+  return true;
+});
+
+await check('coming back clears the reason as well as the clock', () => {
+  const back = grab('markBackInRoom');
+  if (!/outAt=null/.test(back)) return 'Returned no longer clears the clock';
+  if (!/outReason=null/.test(back)) return 'Returned leaves the old reason behind';
+  const out = grab('markOutOfRoom');
+  if (!/outReason=\(reason===['"]feeding['"]\)\?['"]feeding['"]:['"]washroom['"]/.test(out))
+    return 'going out does not record which it is';
+  return true;
+});
+
+await check('every way out of the room clears the reason too', () => {
+  const routes = ['confirmCodeCheckout','confirmFamilyCheckout','doClassCheckout','startNewSession','autoResetSession'];
+  const missing = routes.filter(r => {
+    const fn = grab(r);
+    return /outAt=null/.test(fn) && !/outReason=null/.test(fn);
+  });
+  return missing.length ? missing.join(', ') + ' clear the clock but leave the reason behind' : true;
+});
+
+await check('a new session clears being out of the room in the database, not just on screen', () => {
+  const problems = [];
+  ['startNewSession','autoResetSession'].forEach(name => {
+    const fn = grab(name);
+    ['outAt','outReason','parentStayAt'].forEach(field => {
+      if (!fn.includes("u[k+'/" + field + "']"))
+        return problems.push(name + ' never clears ' + field + ' in the database');
+    });
+  });
+  return problems.length ? problems.join('; ') : true;
+});
+
+await check('checking a child in puts them back in the room', () => {
+  const fn = grab('printNow');
+  if (!/children\[idx\]\.outAt=null/.test(fn))
+    return 'a stale out-of-room mark survives a fresh check-in, so the child alarms the moment they arrive';
+  if (!/children\[idx\]\.outReason=null/.test(fn))
+    return 'a stale reason survives a fresh check-in';
+  return true;
+});
+
+await check('the check-out warning names the children and says which are feeding', () => {
+  const sum = (kids) => new Function('K', `
+    function fullName(n){var p=String(n).split(', ');return (p[1]||'')+' '+(p[0]||'');}
+    ${grab('outOfRoomSummary')} return outOfRoomSummary(K);`)(kids);
+  const kids = [{name:'In, Room'},
+                {name:'Washroom, Kid', outAt:1000},
+                {name:'Feeding, Baby', outAt:1000, outReason:'feeding'}];
+  const got = sum(kids);
+  if (/In Room/.test(got)) return 'it names a child who is in the room: ' + got;
+  if (!/Kid Washroom/.test(got)) return 'it does not name the child at the washroom: ' + got;
+  if (!/Baby Feeding \(feeding\)/.test(got)) return 'it does not say the baby is feeding: ' + got;
+  if (sum([]) !== '' || sum(null) !== '') return 'an empty list should name nobody';
+  return true;
+});
+
+// ===========================================================================
+group('The dashboard must never stop redrawing');
+
+await check('the One-to-One card says how many workers are short', () => {
+  const lab = (t, need) => new Function('T','N', `${grab('snShortLabel')} return snShortLabel(T,N);`)(t, need);
+  if (lab(0,2) !== 'No workers') return 'with nobody there it says "' + lab(0,2) + '"';
+  if (lab(1,2) !== 'Needs 2, has 1') return 'one worker short reads "' + lab(1,2) + '"';
+  if (lab(2,4) !== 'Needs 4, has 2') return 'two children, two workers reads "' + lab(2,4) + '"';
+  return true;
+});
+
+await check('a One-to-One child with no workers does not break the dashboard', () => {
+  // This is the bug that sat in the app from August to November: the One-to-One
+  // card read a variable that did not exist, so the whole redraw threw. The
+  // check-in never saved, the tag never printed, and the warning banner and the
+  // flashing edge froze on whatever they last showed.
+  if (/\bsnNoT\b/.test(src)) return 'snNoT is back in the file';
+
+  const host = document.createElement('div');
+  host.style.display = 'none';
+  host.innerHTML = '<div id="session-summary"></div><div id="class-cards"></div>' +
+                   '<div id="warning-area"></div><div id="screen-edge"></div>';
+  document.body.appendChild(host);
+  try {
+    const run = new Function('KIDS','TEACHERS', `
+      const children = KIDS, teachers = TEACHERS, snWorkers = {};
+      const sessionClasses = ['Nursery','Preschool','Kindergarten','GraceKids 1','GraceKids 2A','GraceKids 2B','Jr Youth'];
+      ${src.match(/const RATIOS=\{[^}]*\}/)[0]};
+      let popupCls = null, lastEdgeState = null, yellowEdgeTimer = null;
+      function buildInactiveMap(){ return {}; }
+      function isInactive(){ return false; }
+      function clsMatch(a,b){ return a===b; }
+      function counterFocusKey(){ return null; }
+      function restoreCounterFocus(){}
+      function renderSessionNudge(){}
+      function setTeachers(){}
+      function setSnWorkers(){}
+      function openClassPopup(){}
+      function escHtml(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+      function fullName(n){var p=String(n).split(', ');return (p[1]||'')+' '+(p[0]||'');}
+      ${src.match(/var OUT_WARN_MIN=[^;]+;/)[0]}
+      ${grab('minutesOut')} ${grab('outLabel')} ${grab('outLevel')} ${grab('outOverdue')}
+      ${grab('outWord')} ${grab('snShortLabel')}
+      ${grab('renderDashboard')}
+      renderDashboard();
+      return { warning: document.getElementById('warning-area').textContent,
+               cards:   document.getElementById('class-cards').textContent,
+               summary: document.getElementById('session-summary').textContent };
+    `);
+
+    // one 1:1 child checked in, nobody recorded as working with them
+    const kids = [{name:'Solo, Sam', sn:true, checkedIn:true, placementCls:'', cls:'GraceKids 1', bday:'2020-01-01'}];
+    const r = run(kids, {});
+    if (!/needs 2 workers, has 0/.test(r.warning))
+      return 'the banner does not warn about the missing workers: "' + r.warning + '"';
+    if (!/No workers/.test(r.cards))
+      return 'the One-to-One card does not say the workers are missing';
+    if (!/1 children checked in/.test(r.summary))
+      return 'the summary did not update';
+
+    // and with a 1:1 child plus a nursery baby out feeding, still no throw
+    const kids2 = kids.concat([{name:'Feeding, Baby', checkedIn:true, cls:'Nursery',
+                                outAt: Date.now() - 45*60000, outReason:'feeding', bday:'2025-06-01'}]);
+    const r2 = run(kids2, {Nursery:2});
+    if (!/out feeding/.test(r2.warning))
+      return 'a baby 45 minutes into a feed is not named in the banner: "' + r2.warning + '"';
+    return true;
+  } finally {
+    host.remove();
+  }
+});
+
+
 const out = document.getElementById('out');
 let lastGroup = null, failed = 0;
 for (const r of results) {

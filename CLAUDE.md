@@ -93,6 +93,21 @@ appears even when the module failed to parse, so it proves nothing.
   sibling is already on file you go and edit that record in the Registry rather
   than typing the family in again. Do not "improve" this into clearing only the
   child that triggered the warning.
+- **A throw inside `renderDashboard` is silent and poisons everything.** The
+  minute tick calls it inside `try{}catch(e){}`, and `printNow` calls it
+  *before* saving the check-in. A `renderDashboard` that throws therefore loses
+  the check-in, loses the attendance record, never prints the tag, leaves the
+  print pop-up open, freezes the warning banner and the flashing edge on stale
+  content, and leaves `sessionResetting` stuck true so the desk stops hearing
+  from every other desk. That is exactly what an undeclared `snNoT` did from
+  August to November 2026. `tests.html` now runs the real `renderDashboard`
+  against a stub DOM — keep that test working rather than deleting it.
+- **Out of the room has two reasons.** `outReason` is `washroom` (5 min warning,
+  7 min red) or `feeding` (25 and 40), and Feeding is a Nursery-only button.
+  Anywhere `outAt` is cleared, `outReason` must be cleared too, and the session
+  reset must clear both *in the database*, not just on the screen — otherwise a
+  stale mark follows the child into next Sunday and alarms the moment they
+  arrive.
 - **Every check-out goes through the same confirmation pop-up**, one child or
   five, and that path is what records `coTime`/`coVia`/`coCode`. Do not add a
   shortcut that skips it — the last one silently stopped recording check-outs.
