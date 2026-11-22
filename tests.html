@@ -1368,6 +1368,95 @@ await check('a One-to-One child with no workers does not break the dashboard', (
 });
 
 
+
+// ===========================================================================
+group('A slow save must not strand the desk');
+
+await check('every hold on the sync listener is released, whatever happens', () => {
+  // While a check-in is being written the app stops listening to the database so
+  // the listener cannot clobber what is on screen. If that hold is never lifted
+  // the desk silently stops hearing from the other desks and shows a roster that
+  // disagrees with the database.
+  const problems = [];
+  ['printNow','startNewSession','autoResetSession'].forEach(name => {
+    const fn = grab(name);
+    if (/sessionResetting\s*=\s*true/.test(fn))
+      problems.push(name + ' sets the hold by hand instead of using holdSync()');
+    if (!/holdSync\(/.test(fn)) { problems.push(name + ' never takes the hold'); return; }
+    if (!/releaseSync\(/.test(fn)) { problems.push(name + ' never releases it'); return; }
+    if (!/finally\s*\{[^}]*releaseSync\(\)/.test(fn))
+      problems.push(name + ' releases the hold only on the happy path — a failed write strands the desk');
+  });
+  return problems.length ? problems.join('; ') : true;
+});
+
+await check('a write that never answers releases the hold on its own', () => {
+  const hold = grab('holdSync');
+  if (!/setTimeout/.test(hold)) return 'there is no safety release, so a stalled write holds the desk for ever';
+  if (!/sessionResetting\s*=\s*false/.test(hold)) return 'the safety release does not lift the hold';
+  const ms = hold.match(/\},\s*(\d+)\)/);
+  if (!ms) return 'could not read how long the safety release waits';
+  const secs = Number(ms[1]) / 1000;
+  if (secs < 5 || secs > 60) return 'the safety release waits ' + secs + ' seconds, which is not sensible';
+  const rel = grab('releaseSync');
+  if (!/clearTimeout/.test(rel)) return 'releasing normally leaves the safety timer running';
+  return true;
+});
+
+await check('a dashboard that fails to draw cannot lose the check-in', () => {
+  const fn = grab('printNow');
+  const hold = fn.indexOf('holdSync(');
+  const draw = fn.indexOf('renderDashboard()');
+  const save = fn.indexOf('syncOneChild');
+  if (hold < 0 || draw < 0 || save < 0) return 'could not find the check-in sequence';
+  if (!(hold < draw && draw < save)) return 'the check-in sequence has moved; re-check this test';
+  // the redraw must be caught, so that a broken dashboard cannot skip the save
+  const around = fn.slice(hold, save);
+  if (!/try\s*\{[^}]*renderDashboard\(\)[^}]*\}\s*catch/.test(around))
+    return 'the redraw is not caught, so a dashboard error still loses the check-in and the tag';
+  return true;
+});
+
+// ===========================================================================
+group('The settling reminder can fire more than once');
+
+await check('checking the child out lets the reminder fire again next time', () => {
+  // The reminder marks the child as "already asked". That mark used to be cleared
+  // only by the Left button, so a child checked out and checked in again on the
+  // same laptop never got a second reminder.
+  const problems = [];
+  ['confirmCodeCheckout','confirmFamilyCheckout','doClassCheckout','startNewSession','autoResetSession'].forEach(name => {
+    const fn = grab(name);
+    if (/parentStayAt=null/.test(fn) && !/delete settleQueued/.test(fn))
+      problems.push(name);
+  });
+  if (problems.length) return problems.join(', ') + ' clear the parent but leave the reminder marked as already asked';
+  // Left still clears it too
+  if (!/delete settleQueued/.test(grab('parentLeft'))) return 'the Left button no longer clears it';
+  return true;
+});
+
+await check('a child who was reminded this morning is reminded again tonight', () => {
+  const MIN = 60000, T = 1000000;
+  // settleDue is what decides; the queue is the second gate. Check both together.
+  const due = (roster, now) => new Function('R','N', `
+    ${src.match(/var OUT_WARN_MIN=[^;]+;/)[0]}
+    ${grab('settleDue')} return settleDue(R,N).map(c=>c.name);`)(roster, now);
+  // after a check-out the app clears parentStayAt and settleReminded
+  const afterCheckout = {name:'Again, Please', checkedIn:false, parentStayAt:null, settleReminded:false};
+  if (due([afterCheckout], T).length) return 'a checked-out child is still due a reminder';
+  // and when they come back in with a parent staying, they are due again
+  const backIn = {name:'Again, Please', checkedIn:true, parentStayAt:T - 10*MIN, settleReminded:false};
+  if (!due([backIn], T).length) return 'a child checked in again is never due a reminder';
+  return true;
+});
+
+await check('nothing is left in the file that nobody calls', () => {
+  const dead = ['sessionDateKey','outReasonOf'].filter(n => new RegExp('function\\s+' + n + '\\s*\\(').test(src));
+  return dead.length ? dead.join(', ') + ' are defined but never called' : true;
+});
+
+
 const out = document.getElementById('out');
 let lastGroup = null, failed = 0;
 for (const r of results) {

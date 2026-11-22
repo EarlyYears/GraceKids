@@ -108,6 +108,17 @@ appears even when the module failed to parse, so it proves nothing.
   reset must clear both *in the database*, not just on the screen — otherwise a
   stale mark follows the child into next Sunday and alarms the moment they
   arrive.
+- **Never set `sessionResetting` by hand.** It stops the sync listener so an
+  in-flight write cannot be clobbered, and while it is on the desk hears nothing
+  from the other desks. Use `holdSync()` / `releaseSync()`, always release in a
+  `finally`, and never let a redraw sit between taking the hold and saving.
+  `holdSync` also lifts itself after 20 seconds, because a Firebase write on bad
+  wifi neither succeeds nor fails — it just sits there, and a hold that waits on
+  it would otherwise last the whole outage with no sign on screen.
+- **`settleQueued` must be cleared wherever `parentStayAt` is.** It is the "we
+  already asked" mark for the settling reminder. Clearing only one of the two
+  means the reminder fires once per child per browser session and then never
+  again.
 - **Every check-out goes through the same confirmation pop-up**, one child or
   five, and that path is what records `coTime`/`coVia`/`coCode`. Do not add a
   shortcut that skips it — the last one silently stopped recording check-outs.
