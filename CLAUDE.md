@@ -135,6 +135,28 @@ appears even when the module failed to parse, so it proves nothing.
   five, and that path is what records `coTime`/`coVia`/`coCode`. Do not add a
   shortcut that skips it — the last one silently stopped recording check-outs.
 
+## Signing in, and the database rules
+
+The desks share **one** Firebase Auth account. Since 23 Nov 2026 that is
+`earlyyears@gfcto.com` (uid `bW3bxmUl9xexPFjjg0DsNMcDd4W2`); the old
+`earlyyearsdesk2@gmail.com` (uid `CsayTD6EBMQFp1EBazw5VVb9naY2`) is being
+retired. The address is prefilled on the sign-in screen - one place in
+`index.html`.
+
+- **The database rules are pinned to specific account IDs**, not just "any
+  signed-in user". Create a new login without adding its uid to the rules and it
+  signs in happily and then shows an empty app - no children, no registry.
+  Always change the rules and the login together, and allow both accounts while
+  switching so no desk is locked out mid-change.
+- The console's Rules tab is read-only for this project. Deploy rules with the
+  **Firebase CLI** instead (it is installed and signed in as the desk account):
+  a `firebase.json` pointing at `database.rules.json`, then
+  `firebase deploy --only database --project early-years-grace-kids-reg`.
+  Keep a copy of the previous rules in the iCloud "GraceKids backups" folder
+  before changing them.
+- Read and write are separate rules. Prove **both** after any change: load the
+  app and confirm the child count, then write and delete a scratch key.
+
 ## The send script
 
 One Apps Script sends every text and every email, and reports text delivery.
