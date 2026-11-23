@@ -272,7 +272,8 @@ await check('delivery status is looked up, and only for messages still unresolve
     };
     var msgChecking=false; var msgCheckNote=''; var MSG_ENDPOINT='x';
     ${src.match(/var SENT_FINAL_MS=[^;]+;/)[0]}
-    ${grab('isResolvedStatus')} ${grab('deliveryStatusFor')} ${grab('refreshDeliveryStatus')}
+    ${grab('isResolvedStatus')} ${grab('deliveryStatusFor')} ${grab('deskToken')} ${grab('refreshDeliveryStatus')}
+    const auth = { currentUser: { getIdToken: async () => 'test-token' } };
     const n = await refreshDeliveryStatus();
     return {n, asked, written};
   `)(store);
