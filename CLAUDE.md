@@ -173,6 +173,24 @@ retired. The address is prefilled on the sign-in screen - one place in
 - Read and write are separate rules. Prove **both** after any change: load the
   app and confirm the child count, then write and delete a scratch key.
 
+## Signing a desk out
+
+Utilities > **Sign out of this desk**. It asks first, says the children stay
+checked in, and refuses while `dirtyWrites` is non-empty so unsent changes are
+not lost. Before 23 Nov 2026 `doSignOut` existed but nothing called it, so
+changing a desk's account meant clearing the browser's site data - that cost
+two hours on the day the login moved. Keep it reachable.
+
+**A desk that signs in but shows no children** is almost always one machine's
+browser, not the app or the database: the other desks working proves everything
+shared is fine. Incognito working narrows it to stored site data or an
+extension. The quickest split is to open
+`https://early-years-grace-kids-reg-default-rtdb.firebaseio.com/.json` in that
+browser - "Permission denied" means the database is reachable and the stored
+data is at fault, which
+`chrome://settings/content/siteDetails?site=https%3A%2F%2Fearlyyears.github.io`
+> Delete data fixes.
+
 ## The send script
 
 One Apps Script sends every text and every email, and reports text delivery.

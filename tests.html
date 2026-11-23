@@ -1790,6 +1790,46 @@ await check('opening, cancelling and saving all keep the two records in step', (
 });
 
 
+
+// ===========================================================================
+group('Signing a desk out');
+
+await check('there is a way to sign out, and it is reachable', () => {
+  // For months the function existed and nothing in the interface called it, so
+  // switching a desk's account meant clearing browser data. That cost two hours
+  // on 23 Nov 2026.
+  if (!/utilAction\('signout'\)/.test(src)) return 'nothing in the interface offers to sign out';
+  const act = grab('utilAction');
+  if (!/which==='signout'/.test(act)) return 'the menu entry is not wired to anything';
+  if (!/confirmSignOut\(\)/.test(act)) return 'it does not go through the confirmation';
+  if (!/function doSignOut/.test(src)) return 'the sign-out itself has gone';
+  return true;
+});
+
+await check('it asks first, and says what will and will not happen', () => {
+  const fn = grab('confirmSignOut');
+  if (!/confirm\(/.test(fn)) return 'it signs out without asking';
+  if (!/does not check anybody out/i.test(fn))
+    return 'it does not reassure them the children stay checked in';
+  if (!/email and password/i.test(fn))
+    return 'it does not warn they will need the password to get back in';
+  // it must not check anybody out itself
+  if (/checkedIn\s*=\s*false/.test(fn)) return 'signing out checks children out';
+  if (/syncOneChild|set\(ref/.test(fn)) return 'signing out writes to the database';
+  return true;
+});
+
+await check('it refuses while changes are still unsaved', () => {
+  const fn = grab('confirmSignOut');
+  if (!/dirtyWrites/.test(fn)) return 'it does not check for unsaved changes';
+  const guard = fn.slice(0, fn.indexOf('confirm('));
+  if (!/return;/.test(guard)) return 'it warns about unsaved changes but signs out anyway';
+  if (!/All changes saved/.test(fn))
+    return 'it does not tell them what to wait for';
+  return true;
+});
+
+
 const out = document.getElementById('out');
 let lastGroup = null, failed = 0;
 for (const r of results) {
