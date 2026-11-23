@@ -119,6 +119,18 @@ appears even when the module failed to parse, so it proves nothing.
   already asked" mark for the settling reminder. Clearing only one of the two
   means the reminder fires once per child per browser session and then never
   again.
+- **An unsent incident report warns, it does not block.** It used to disable the
+  tick box for the child *and every sibling*, so on 21 Nov 2026 an expired Google
+  permission stopped a family going home and no retry at the desk could ever have
+  worked. Check-out now asks and proceeds, the report stays pending, and
+  **Send report** and **Discard** both sit in the desk dialog. Never make a child
+  wait on something only Aileen can fix. Bulk check-out still skips them on
+  purpose, so an incident is handed over face to face.
+- **One Apps Script sends every text and every email**, and its address lives in
+  `SEND_SCRIPT_URL` - one line, nothing else. Texts need the external-request
+  permission, emails need the mail permission, and they are granted separately:
+  texts working proves nothing about email. Moving the script to another Google
+  account moves the texting too, so never switch it in the hours before a service.
 - **Every check-out goes through the same confirmation pop-up**, one child or
   five, and that path is what records `coTime`/`coVia`/`coCode`. Do not add a
   shortcut that skips it — the last one silently stopped recording check-outs.

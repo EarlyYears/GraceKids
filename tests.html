@@ -184,7 +184,7 @@ await check('a check-out records the time and the code that was presented', asyn
     const syncOneChild=async()=>{}; const alert=()=>{};
     ${grab('outOfRoomNames')} ${grab('checkoutRowHTML')} ${grab('confirmFamilyCheckout')}
     pendingCheckoutNames=children.map(c=>c.name);
-    BOX.innerHTML=children.map((c,i)=>checkoutRowHTML(c,i,'co-fam',false)).join('');
+    BOX.innerHTML=children.map((c,i)=>checkoutRowHTML(c,i,'co-fam')).join('');
     BOX.querySelector('#co-fam-1').checked=false;      // Ben stays in
     await confirmFamilyCheckout();
     return children.map(c=>({n:c.name,out:!c.checkedIn,time:!!c.coTime,code:c.coCode||null}));`)(box);
@@ -1454,6 +1454,102 @@ await check('a child who was reminded this morning is reminded again tonight', (
 await check('nothing is left in the file that nobody calls', () => {
   const dead = ['sessionDateKey','outReasonOf'].filter(n => new RegExp('function\\s+' + n + '\\s*\\(').test(src));
   return dead.length ? dead.join(', ') + ' are defined but never called' : true;
+});
+
+
+
+// ===========================================================================
+group('An unsent incident report must never hold up a child');
+
+await check('a child with a pending report can still be ticked for check-out', () => {
+  // On 21 Nov 2026 the email service lost its permission to send. The report
+  // could not go, and that stopped the child - and every sibling - being handed
+  // back to their parent. A report that cannot be emailed is not a reason to
+  // keep a child at the desk.
+  const row = (child) => new Function('C', `
+    ${grab('escHtml')} function fullName(n){var p=String(n).split(', ');return (p[1]||'')+' '+(p[0]||'');}
+    ${grab('checkoutRowHTML')} return checkoutRowHTML(C,0,'co-fam');`)(child);
+
+  const host = document.createElement('div'); host.style.display='none'; document.body.appendChild(host);
+  try {
+    host.innerHTML = row({name:'Hurt, Sam', cls:'Nursery', pendingIncident:{circumstance:'bumped head'}});
+    const cb = host.querySelector('input[type=checkbox]');
+    if (!cb) return 'the row has no tick box at all';
+    if (cb.disabled) return 'the tick box is still disabled, so the child cannot be checked out';
+    if (!cb.checked) return 'the child is not ticked by default like everyone else';
+    const text = host.textContent;
+    if (!/Incident/.test(text)) return 'nothing on the row says there is an incident';
+    if (!/Send report/.test(text)) return 'there is no way to send the report from the desk';
+    if (!/Discard/.test(text)) return 'Discard is still buried on another tab';
+    // a child with nothing pending is unchanged
+    host.innerHTML = row({name:'Fine, Jo', cls:'Nursery'});
+    const cb2 = host.querySelector('input[type=checkbox]');
+    if (cb2.disabled || !cb2.checked) return 'an ordinary child is no longer tickable';
+    if (/Discard|Send report/.test(host.textContent)) return 'an ordinary child is offered incident buttons';
+    return true;
+  } finally { host.remove(); }
+});
+
+await check('check-out asks about an unsent report instead of refusing', () => {
+  const problems = [];
+  ['confirmCodeCheckout','confirmFamilyCheckout'].forEach(name => {
+    const fn = grab(name);
+    const m = fn.match(/const blocked=kids\.filter\(c=>c\.pendingIncident\);[^;]*;/);
+    if (!m) { problems.push(name + ': could not find the incident step'); return; }
+    if (/alert\(/.test(m[0]) && !/confirm\(/.test(m[0]))
+      problems.push(name + ' still refuses the check-out outright');
+    if (!/confirm\(/.test(m[0]))
+      problems.push(name + ' no longer mentions the unsent report at all');
+    if (!/not been sent/i.test(m[0]))
+      problems.push(name + ' does not say the report is unsent');
+  });
+  // and the report must survive the check-out, so it can still be sent
+  ['confirmCodeCheckout','confirmFamilyCheckout','doClassCheckout'].forEach(name => {
+    if (/pendingIncident=null/.test(grab(name)))
+      problems.push(name + ' throws the report away when the child goes home');
+  });
+  return problems.length ? problems.join('; ') : true;
+});
+
+await check('a permission failure tells the volunteer what it really means', () => {
+  const msg = (bad) => new Function('B', `${grab('incidentSendProblem')} return incidentSendProblem({ok:[],bad:B});`)(bad);
+  const google = msg(['mum@example.com (the script does not have permission to perform that action. Required permissions: ...)']);
+  if (/does not have permission to perform that action/.test(google))
+    return 'it still just repeats Google\'s wording at the volunteer';
+  if (!/re-authoris/i.test(google)) return 'it does not say what is actually wrong';
+  if (!/Pending list/.test(google)) return 'it does not reassure them the report is safe';
+  if (!/check the children out/i.test(google)) return 'it does not tell them they can still check the children out';
+  // an ordinary bounce still reads like an ordinary bounce
+  const bounce = msg(['typo@@example.com (invalid address)']);
+  if (/re-authoris/i.test(bounce)) return 'an ordinary bad address is blamed on permissions';
+  if (!/try again/i.test(bounce)) return 'an ordinary failure does not invite a retry';
+  return true;
+});
+
+// ===========================================================================
+group('Moving the send script to another Google account');
+
+await check('the script address is written down in exactly one place', () => {
+  // One Apps Script sends every text and every email. When it moves to another
+  // Google account, exactly one line should need changing - otherwise half the
+  // app talks to the old account and half to the new one.
+  const literals = src.match(/https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec/g) || [];
+  if (literals.length === 0) return 'the send script address has vanished from the app';
+  if (literals.length > 1) return 'the address is written out ' + literals.length + ' times; it should be in one constant';
+  if (!/const SEND_SCRIPT_URL=/.test(src)) return 'there is no named constant holding it';
+  if (/fetch\('https:\/\/script\.google/.test(src)) return 'something still calls the address directly';
+  return true;
+});
+
+await check('everything that talks to Google goes through that one constant', () => {
+  const callers = ['sendTextMessage','sendEmailToParents','confirmSendIncident','pruneMessageLog','importFromSheet'];
+  const missing = callers.filter(n => {
+    const fn = grab(n);
+    return /fetch\(/.test(fn) && !/SEND_SCRIPT_URL|MSG_ENDPOINT/.test(fn);
+  });
+  if (missing.length) return missing.join(', ') + ' do not use the shared address';
+  if (!/MSG_ENDPOINT=SEND_SCRIPT_URL/.test(src)) return 'the delivery checker keeps its own copy of the address';
+  return true;
 });
 
 
