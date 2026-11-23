@@ -1554,6 +1554,50 @@ await check('everything that talks to Google goes through that one constant', ()
 });
 
 
+
+// ===========================================================================
+group('Being told why sign-in failed');
+
+await check('each kind of failure says something different and useful', () => {
+  const msg = (code, email) => new Function('C','E', `
+    ${grab('signInProblem')} return signInProblem({code:C}, E);`)(code, email);
+
+  const cases = {
+    'auth/network-request-failed': /internet|Wi/i,
+    'auth/too-many-requests':      /Too many|wait/i,
+    'auth/user-disabled':          /turned off/i,
+    'auth/invalid-email':          /not a valid email/i,
+    'auth/user-not-found':         /no account/i,
+    'auth/wrong-password':         /Wrong email or password/i,
+    'auth/invalid-credential':     /Wrong email or password/i
+  };
+  const wrong = Object.keys(cases).filter(c => !cases[c].test(msg(c, 'a@b.com')));
+  if (wrong.length) return 'unhelpful message for: ' + wrong.join(', ');
+
+  // every message must be distinct, otherwise we are back to one-size-fits-all
+  const texts = Object.keys(cases).map(c => msg(c, 'a@b.com'));
+  const distinct = new Set(texts.filter(t => !/Wrong email or password/.test(t)));
+  if (distinct.size < 5) return 'the messages are not distinct enough to tell the causes apart';
+
+  // the address typed is shown back, so a missing character is visible
+  if (!/earlyyearsdesk@gmail\.com/.test(msg('auth/wrong-password','earlyyearsdesk@gmail.com')))
+    return 'the message does not show which address was tried';
+  // and an unknown code still says something, rather than nothing
+  const odd = msg('auth/something-new','a@b.com');
+  if (!odd || odd.length < 20) return 'an unexpected error produces no useful message';
+  if (!/something-new/.test(odd)) return 'an unexpected error hides its code, leaving nothing to go on';
+  return true;
+});
+
+await check('the sign-in screen actually uses it', () => {
+  const fn = grab('doLogin');
+  if (!/signInProblem\(/.test(fn)) return 'the login screen still shows the old one-size message';
+  if (/Check the email and password, and your connection/.test(fn))
+    return 'the old catch-all message is still there';
+  return true;
+});
+
+
 const out = document.getElementById('out');
 let lastGroup = null, failed = 0;
 for (const r of results) {
