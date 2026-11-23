@@ -322,7 +322,7 @@ const EARLY_YEARS=['Nursery','Preschool','Kindergarten'];
 // Google before it sends anything, so the public address is not enough on
 // its own. Empty if the desk is somehow not signed in - the script refuses.
 async function deskToken(){try{var u=auth&&auth.currentUser;return u?(await u.getIdToken()):'';}catch(e){return '';}}
-const SEND_SCRIPT_URL='https://script.google.com/macros/s/AKfycbxgRpHqfEo9l9mHMyvYjnnPbqmm09fHyaU_q7FUTbXU3_pnxvFZn_ATZtJhmtDHmpUwpg/exec';
+const SEND_SCRIPT_URL='https://script.google.com/macros/s/AKfycbx016hXEdqsqTvt4cSzOVay2HlrmsaK0NoNTIv0Nv5TevQK6KK8PlhZNFnzDecP03jkew/exec';
 const RATIOS={Nursery:3,Preschool:4,Kindergarten:6,'GraceKids 1':8,'GraceKids 2A':10,'GraceKids 2B':10,'Jr Youth':10};
 const teachers={Nursery:0,Preschool:0,Kindergarten:0,'GraceKids 1':0,'GraceKids 2A':0,'GraceKids 2B':0,'Jr Youth':0,'One-to-One':0};const snWorkers={Nursery:0,Preschool:0,Kindergarten:0,'GraceKids 1':0,'GraceKids 2A':0,'GraceKids 2B':0,'Jr Youth':0};
 const MORNING_PLACEMENT=['Nursery','Preschool','Kindergarten'];

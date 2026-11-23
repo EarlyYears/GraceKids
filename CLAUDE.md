@@ -135,6 +135,27 @@ appears even when the module failed to parse, so it proves nothing.
   five, and that path is what records `coTime`/`coVia`/`coCode`. Do not add a
   shortcut that skips it — the last one silently stopped recording check-outs.
 
+## The send script
+
+One Apps Script sends every text and every email, and reports text delivery.
+Its address is `SEND_SCRIPT_URL` in `index.html` - one line, nothing else.
+
+- Owned by **earlyyears@gfcto.com**, project "GraceKids send script". Emails
+  come from that address. Twilio credentials live in its Project Settings >
+  Script Properties, not in the code.
+- **Every request carries the desk's Firebase sign-in** (`deskToken()`), and the
+  script verifies it with Google before sending anything. The address is public
+  - it has to be, the desks call it with no Google login - so the sign-in check
+  is what actually protects it. There is also a 400/day message cap.
+- Texts and emails need **separately granted** Google permissions. Texts working
+  proves nothing about email; that is exactly how incident emails sat broken.
+- **Do not test these endpoints with `curl -L`.** Google answers a POST with a
+  redirect and curl turns it into a GET, so you get a Drive "unable to open the
+  file" page and conclude the deployment is broken when it is fine. Test from a
+  browser page with `fetch`, the way the app does.
+- The old script (`Early Years App Text`, on earlyyearsdesk2@gmail.com) is no
+  longer used by the app. Leave it until the new one has run a few Sundays.
+
 ## Deploying
 
 Pushing to `main` deploys to GitHub Pages. There is no staging environment and
