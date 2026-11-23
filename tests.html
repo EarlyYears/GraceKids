@@ -1598,6 +1598,103 @@ await check('the sign-in screen actually uses it', () => {
 });
 
 
+
+// ===========================================================================
+group('Nothing stops an incident being written down');
+
+await check('a child with no parent email can still have a report logged', () => {
+  // 19 of the 132 active children had no parent email on file. For any of them
+  // the app used to refuse to record an injury at all until someone found an
+  // address. The record matters more than the email.
+  const fn = grab('logIncident');
+  const gate = /No parent email on file[\s\S]{0,80}?return;/.test(fn);
+  if (gate) return 'a missing parent email still stops the report being saved';
+  if (!/hasEmail/.test(fn)) return 'it no longer notices a missing email at all - the desk should still be told';
+  // and it must be mentioned once the report is safely saved
+  if (!/no parent email on file/i.test(fn)) return 'nothing tells the desk the report cannot reach the parents';
+  return true;
+});
+
+await check('the report can still be sent, to Allie, with no parent email', () => {
+  const fn = grab('openSendIncident');
+  if (/No parent emails on file[\s\S]{0,80}?return;/.test(fn))
+    return 'the send dialog still refuses to open without a parent email';
+  if (!/allie@gfcto\.com/.test(fn)) return 'the coordinator is no longer a recipient';
+  if (!/parentEmails\.length\?/.test(fn))
+    return 'the dialog does not distinguish having a parent email from not having one';
+  if (!/Allie only/i.test(fn)) return 'the dialog does not say the parents will not receive it';
+  return true;
+});
+
+await check('a second incident is added to the first, never refused', () => {
+  const fn = grab('logIncident');
+  if (/already a pending incident[\s\S]{0,60}?return;\}ch\.pendingIncident=\{date:localDay/.test(fn))
+    return 'a second report for the same child is still refused outright';
+  if (!/confirm\(/.test(fn)) return 'it no longer asks before merging the two reports';
+  if (!/added /.test(fn)) return 'the merged report does not mark where the second one starts';
+  // nothing from the first report may be thrown away
+  const merge = fn.slice(fn.indexOf('_prev'));
+  ['circumstance','action','informed','date'].forEach(k => { if (!merge.includes('_prev.'+k) && !merge.includes("_prev."+k)) throw new Error('the merge drops '+k); });
+  if (!/_prev\.volunteer/.test(merge)) return 'the first volunteer\'s name is lost';
+  if (/pendingIncident=null/.test(fn)) return 'logging a second report wipes the first';
+  return true;
+});
+
+await check('merging keeps both accounts of what happened', () => {
+  // run the merge for real against two invented reports
+  const merged = new Function(`
+    const prev = {date:'2026-11-22', session:'Morning', volunteer:'Dawn',
+                  circumstance:'Bumped his head on the table', action:'Ice pack',
+                  informed:'No', ts: 111};
+    const vol='Sam', circ='Scraped his knee outside', act='Cleaned and a plaster', informed='Yes';
+    const _prev = prev;
+    const out = {date:_prev.date||'x', session:_prev.session,
+      volunteer:[_prev.volunteer, vol].filter(Boolean).join(' / '),
+      circumstance:(_prev.circumstance||'')+'\\n\\n--- added 10:15 AM by '+vol+' ---\\n'+circ,
+      action:[(_prev.action||''), act].filter(function(x){return x&&x.trim();}).join('\\n\\n'),
+      informed:(_prev.informed==='Yes'||informed==='Yes')?'Yes':'No', ts:_prev.ts||0};
+    return out;`)();
+  if (!/Bumped his head/.test(merged.circumstance)) return 'the first account was lost';
+  if (!/Scraped his knee/.test(merged.circumstance)) return 'the second account was lost';
+  if (!/Ice pack/.test(merged.action) || !/plaster/.test(merged.action)) return 'an action taken was lost';
+  if (merged.volunteer !== 'Dawn / Sam') return 'both volunteers should be named, got ' + merged.volunteer;
+  if (merged.informed !== 'Yes') return 'if either says the parents were told, the report must say Yes';
+  if (merged.date !== '2026-11-22') return 'the original date must be kept';
+  if (merged.ts !== 111) return 'the original time must be kept';
+  return true;
+});
+
+// ===========================================================================
+group('A button never does nothing in silence');
+
+await check('the out-of-room buttons say something when the child has moved', () => {
+  // eleven handlers warn and refresh when a child's record has shifted. These
+  // four were written later and just gave up, which reads as a dead button.
+  const problems = ['markOutOfRoom','markBackInRoom','parentLeft'].filter(n => {
+    const fn = grab(n);
+    return /childIdxByName\(/.test(fn);
+  });
+  if (problems.length) return problems.join(', ') + ' still give up without a word';
+  const ok = ['markOutOfRoom','markBackInRoom','parentLeft'].every(n => /liveIdx\(/.test(grab(n)));
+  if (!ok) return 'they do not use the version that warns and refreshes';
+  // liveIdx must still be the thing that warns
+  const live = grab('liveIdx');
+  if (!/alert\(/.test(live)) return 'liveIdx no longer tells the user anything';
+  if (!/renderList\(\)/.test(live)) return 'liveIdx no longer refreshes the stale list';
+  return true;
+});
+
+await check('a full room says what to do about it', () => {
+  const src2 = src;
+  const m = src2.match(/\$\{cls\} is at capacity[^`]*/);
+  if (!m) return 'could not find the capacity message';
+  if (/This child cannot be checked in/.test(m[0])) return 'it still just refuses with no way forward';
+  if (!/extra teacher/i.test(m[0])) return 'it does not mention adding a teacher';
+  if (!/check a child out/i.test(m[0])) return 'it does not mention checking a child out';
+  return true;
+});
+
+
 const out = document.getElementById('out');
 let lastGroup = null, failed = 0;
 for (const r of results) {

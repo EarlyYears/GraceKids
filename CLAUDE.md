@@ -131,6 +131,14 @@ appears even when the module failed to parse, so it proves nothing.
   permission, emails need the mail permission, and they are granted separately:
   texts working proves nothing about email. Moving the script to another Google
   account moves the texting too, so never switch it in the hours before a service.
+- **An incident must always be recordable.** A missing parent email, an existing
+  unsent report, a broken email service - none of these may stop a volunteer
+  writing down that a child was hurt. The report is the point; the email is a
+  consequence. With no parent email it still goes to the coordinator, and a
+  second report is merged into the first rather than refused. When reviewing
+  this app, go through **every place it refuses** and ask whether the person at
+  the desk, with a child in front of them, can actually resolve it. That is the
+  class of bug that structural review does not find.
 - **Every check-out goes through the same confirmation pop-up**, one child or
   five, and that path is what records `coTime`/`coVia`/`coCode`. Do not add a
   shortcut that skips it — the last one silently stopped recording check-outs.
