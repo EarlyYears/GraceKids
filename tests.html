@@ -1745,6 +1745,51 @@ await check('the inactive answer itself is unchanged', () => {
 });
 
 
+
+// ===========================================================================
+group('A medical note being typed survives the sync');
+
+await check('the note editor does not live on the child record', () => {
+  // The sync rebuilds every child from the database on any change anywhere.
+  // Anything about the editor kept on the child was therefore wiped mid-typing:
+  // the editor closed and the typed text was replaced by the stored note, so
+  // saving wrote the old note back over a volunteer's work.
+  if (!/var medDrafts=\{\},medEditing=\{\}/.test(src))
+    return 'the editor state is not kept outside the child record';
+  const reg = grab('renderRegistry');
+  if (/c\.editingRegMed\?/.test(reg)) return 'the registry still asks the child record whether the editor is open';
+  if (!/medOpen\(nm\)/.test(reg)) return 'the registry does not ask the external record';
+  // the box must be identifiable so its value can be read back
+  if (!/id="reg-med-\$\{i\}"/.test(reg)) return 'the note box has no id, so the typed value cannot be read from it';
+  return true;
+});
+
+await check('saving takes the text from the box, not from a copy', () => {
+  const fn = grab('saveRegMed');
+  if (!/regMedTyped\(i,n,T\)/.test(fn)) return 'saving does not go through the reader';
+  if (/children\[T\]\.draftMedical\|\|''\)\.trim\(\)/.test(fn))
+    return 'saving still reads the copy the sync overwrites';
+  const rd = grab('regMedTyped');
+  const box = rd.indexOf("getElementById('reg-med-'");
+  const draft = rd.indexOf('medDrafts');
+  if (box < 0) return 'the reader does not look at the box on screen';
+  if (draft >= 0 && box > draft) return 'the reader prefers the stored copy over the box on screen';
+  return true;
+});
+
+await check('opening, cancelling and saving all keep the two records in step', () => {
+  const start = grab('startRegMedEdit'), cancel = grab('cancelRegMedEdit'), save = grab('saveRegMed');
+  if (!/medEditing\[n\]=true/.test(start)) return 'opening does not record that the editor is open';
+  if (!/medDrafts\[n\]=/.test(start)) return 'opening does not seed the draft';
+  ['cancel','save'].forEach(() => {});
+  if (!/delete medDrafts\[n\]/.test(cancel) || !/delete medEditing\[n\]/.test(cancel))
+    return 'cancelling leaves the editor marked open, or the draft behind';
+  if (!/delete medDrafts\[n\]/.test(save) || !/delete medEditing\[n\]/.test(save))
+    return 'saving leaves the editor marked open, or the draft behind';
+  return true;
+});
+
+
 const out = document.getElementById('out');
 let lastGroup = null, failed = 0;
 for (const r of results) {

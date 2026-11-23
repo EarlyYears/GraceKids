@@ -139,6 +139,14 @@ appears even when the module failed to parse, so it proves nothing.
   this app, go through **every place it refuses** and ask whether the person at
   the desk, with a child in front of them, can actually resolve it. That is the
   class of bug that structural review does not find.
+- **Never keep anything a person is typing on the child record.** The sync
+  listener rebuilds every child from the database on any change anywhere, so a
+  field like `draftMedical` or `editingRegMed` is wiped mid-typing: the editor
+  closes and saving writes the stored value back over the volunteer's work. A
+  medical note was lost this way. Editor state lives in `medDrafts`/`medEditing`,
+  keyed by name, and saving reads the box on screen (`reg-med-<i>`). The incident,
+  registration and desk-note forms are safe because they read the screen too -
+  keep it that way.
 - **Every check-out goes through the same confirmation pop-up**, one child or
   five, and that path is what records `coTime`/`coVia`/`coCode`. Do not add a
   shortcut that skips it — the last one silently stopped recording check-outs.
