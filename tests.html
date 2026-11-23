@@ -1695,6 +1695,56 @@ await check('a full room says what to do about it', () => {
 });
 
 
+
+// ===========================================================================
+group('The same answer is not worked out over and over');
+
+await check('nothing works out "last seen" once per child', () => {
+  // isInactive(child) with no map rebuilds the whole attendance index inside
+  // itself. Called once per child that is 165 rebuilds of 1,600+ records for
+  // one answer that does not change between rows.
+  const bare = (src.match(/isInactive\((?:c|ch|child|x)\)/g) || []);
+  if (bare.length) return bare.length + ' place(s) still rebuild it per child: ' + bare.join(', ');
+  // the check-in list must use the map it already built
+  const list = grab('renderList');
+  if (!/buildInactiveMap\(\)/.test(list)) return 'the check-in list no longer works it out at all';
+  if (!/isInactive\(c,\s*inactiveMap\)/.test(list)) return 'the check-in list does not reuse the answer it built';
+  // and the email list must build it once, outside the loop
+  const em = grab('getEmailRecipients');
+  const build = em.indexOf('buildInactiveMap()');
+  const loop  = em.indexOf('children.forEach');
+  if (build < 0) return 'the email list no longer works it out';
+  if (build > loop) return 'the email list still works it out inside the loop over children';
+  return true;
+});
+
+await check('the inactive answer itself is unchanged', () => {
+  // same records in, same answer out - whether the map is passed in or not
+  const run = (history, child, nowMs) => new Function('H','C','N', `
+    const now = N; const checkInHistory = H;
+    function localDay(d){var x=(d instanceof Date)?d:new Date(d);
+      return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');}
+    ${grab('buildInactiveMap')} ${grab('isInactive')}
+    return { passedIn: isInactive(C, buildInactiveMap()), workedOutInside: isInactive(C) };`)(history, child, nowMs);
+
+  const now = new Date('2026-11-23T12:00:00').getTime();
+  const cases = [
+    { h:[{name:'Seen, Lately', date:'2026-11-22'}], c:{name:'Seen, Lately'}, want:false },
+    { h:[{name:'Long, Ago',    date:'2026-06-14'}], c:{name:'Long, Ago'},    want:true  },
+    { h:[],                                         c:{name:'Never, Here'},  want:false },
+    { h:[{name:'Archived, One',date:'2026-11-22'}], c:{name:'Archived, One', manualInactive:true}, want:true },
+    { h:[{name:'Back, Again',  date:'2026-06-14'}], c:{name:'Back, Again', reactivatedAt: now - 1000}, want:false }
+  ];
+  const wrong = [];
+  cases.forEach(t => {
+    const r = run(t.h, t.c, now);
+    if (r.passedIn !== r.workedOutInside) wrong.push(t.c.name + ': the two ways disagree');
+    else if (r.passedIn !== t.want) wrong.push(t.c.name + ': got ' + r.passedIn + ', wanted ' + t.want);
+  });
+  return wrong.length ? wrong.join('; ') : true;
+});
+
+
 const out = document.getElementById('out');
 let lastGroup = null, failed = 0;
 for (const r of results) {
